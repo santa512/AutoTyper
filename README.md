@@ -12,8 +12,8 @@ Both editions are version 0.2 for Windows x64. The recommended download includes
 
 | Edition | Download | Size | Included |
 | --- | --- | --- | --- |
-| **Auto Typer — recommended** | [AutoTyper.exe](https://github.com/santa512/AutoTyper/releases/download/v0.2/AutoTyper.exe) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.2/AutoTyper.exe.sha256) | About 109 MiB | Typing, clipboard paste, QR scanning, English OCR, screenshot save/copy, R2 sharing and history, five global hotkeys, saved settings, single-instance behavior and tray mode. |
-| **Auto Typer Compact** | [AutoTyperCompact.exe](https://github.com/santa512/AutoTyper/releases/download/v0.2/AutoTyperCompact.exe) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.2/AutoTyperCompact.exe.sha256) | Under 1 MiB | A lighter typing app with clipboard paste, natural rhythm, corrections, highlighting, a global typing hotkey and pin on top. No screen tools, OCR, sharing or tray menu. |
+| **Auto Typer — recommended** | [AutoTyper.exe](https://github.com/santa512/AutoTyper/releases/download/v0.2/AutoTyper.exe) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.2/AutoTyper.exe.sha256) | About 114.1 MB | Typing, clipboard paste, QR scanning, English OCR, screenshot save/copy, R2 sharing and history, five global hotkeys, saved settings, single-instance behavior and tray mode. |
+| **Auto Typer Compact** | [AutoTyperCompact.exe](https://github.com/santa512/AutoTyper/releases/download/v0.2/AutoTyperCompact.exe) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.2/AutoTyperCompact.exe.sha256) | Under 1 MB | A lighter typing app with clipboard paste, natural rhythm, corrections, highlighting, a global typing hotkey and pin on top. No screen tools, OCR, sharing or tray menu. |
 
 The guide below describes the recommended app; see the [Compact guide](native/README.md) for its usage and build instructions. Run one edition at a time to avoid conflicts between their typing shortcuts. Single-instance behavior applies to copies of the recommended app; Compact remains a separate application.
 
@@ -23,7 +23,7 @@ The guide below describes the recommended app; see the [Compact guide](native/RE
 2. Double-click it. Neither edition needs an installer.
 3. Keep the recommended filename as **AutoTyper.exe**. Its bundled runtimes and English OCR models extract to a local cache on first launch, which can take a moment.
 
-Only your chosen EXE is needed; the checksum is optional verification. Do not download the source ZIP to run the app. The main download is about 109 MiB because it bundles its runtimes and offline OCR. Compact is under 1 MiB and uses Windows system components directly.
+Only your chosen EXE is needed; the checksum is optional verification. Do not download the source ZIP to run the app. The main download is about 114.1 MB because it bundles its runtimes and offline OCR. Compact is under 1 MB and uses Windows system components directly.
 
 **Upgrading:** choose **Exit** in the old tray menu before starting v0.2. Closing a tray-enabled window only hides it. Existing compatible settings and local sharing history are retained. These executables are unsigned, so Windows may show an unknown-publisher or reputation prompt.
 
