@@ -1,0 +1,48 @@
+name: Build Windows release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag (for example v0.1)
+        required: true
+        default: v0.1
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-2025
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Publish self-contained executable
+        shell: pwsh
+        run: dotnet publish TypingPractice.csproj -p:PublishProfile=SingleFile-x64 -c Release -p:Platform=x64
+      - name: Checksum
+        shell: pwsh
+        run: |
+          $exe = 'dist/SingleFile-win-x64/TypingPractice.exe'
+          $hash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  TypingPractice.exe" | Set-Content -LiteralPath "$exe.sha256" -Encoding ascii
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view $env:RELEASE_TAG *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $env:RELEASE_TAG --verify-tag --title "Typing Practice $env:RELEASE_TAG" --notes-file "release-notes/$env:RELEASE_TAG.md"
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create release.' }
+          }
+          gh release upload $env:RELEASE_TAG 'dist/SingleFile-win-x64/TypingPractice.exe' 'dist/SingleFile-win-x64/TypingPractice.exe.sha256' --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Could not upload release assets.' }

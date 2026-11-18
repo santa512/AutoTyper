@@ -1,0 +1,134 @@
+# Typing Practice
+
+**Version 0.1** · Windows desktop · x64 · Initial release
+
+A small Windows app that types your text into another application with an adjustable, natural rhythm. It supports punctuation pauses, occasional adjacent-key mistakes, and delayed corrections using the arrow keys and Backspace.
+
+**[Download TypingPractice.exe](https://github.com/santa512/TypingPractice/releases/download/v0.1/TypingPractice.exe)** · **[Download page](https://santa512.github.io/TypingPractice/)** · **[Release history](https://github.com/santa512/TypingPractice/releases)**
+
+## Download and launch
+
+1. Download `TypingPractice.exe` from the link above or the repository's **Releases** page.
+2. Keep its filename as `TypingPractice.exe` and double-click it.
+3. No installer or separate .NET / Windows App SDK runtime installation is required. Dependencies unpack automatically into a local cache on first launch.
+
+The self-contained download is approximately **92 MB** because it includes both runtimes. The extracted runtime uses additional disk space. You only need to distribute the single EXE; do not download GitHub's source ZIP to run the app.
+
+### Requirements
+
+- Windows 10 version 1809 or later, or Windows 11.
+- An x64 computer. Version 0.1 does not ship separate x86 or ARM64 binaries.
+- A destination application that accepts simulated Windows keyboard input.
+
+### Verify the download
+
+The release includes `TypingPractice.exe.sha256`. To calculate the EXE's SHA-256 checksum:
+
+```powershell
+Get-FileHash .\TypingPractice.exe -Algorithm SHA256
+```
+
+Compare the result with the hash in the accompanying checksum file.
+
+## Use the app
+
+1. Paste or enter your text in **Practice text**.
+2. Adjust the pace, rhythm, mistake chance, and ready delay if needed.
+3. Press **Start**, then click the destination text field during the ready countdown. Alternatively, leave the destination focused and press **Ctrl+Shift+Space**.
+4. Release the hotkey modifiers. Typing begins after the countdown.
+5. Use the global hotkey to **pause or resume** without switching back to Typing Practice.
+
+The input text stays read-only during a run. The current character is highlighted even while the destination app has focus; during corrections, the highlight returns to the character being fixed. A small circular indicator, character count, and status sit on the same row as the delay and hotkey controls. Hover over status for activity details.
+
+**Stop** ends the run. **Reset progress** clears progress without deleting your text. **Pin on top** keeps the window visible above other apps. The Start/Pause and Stop controls remain in the bottom-right corner.
+
+## Settings
+
+| Control | Default | Behavior |
+| --- | --- | --- |
+| Pace | 1.0× | 0.5× to 2.0×; scales delays between simulated keys. |
+| Rhythm | 50% | 0% to 100%; adds short speed variations and occasional pauses. |
+| Mistake chance | 1% | 0% to 12%; applies to letters, with adjacent QWERTY-key substitutions where available. |
+| Ready delay | 2.5 seconds | 0 to 10 seconds to focus the destination. |
+| Global hotkey | Ctrl+Shift+Space | Starts, pauses, or resumes the run. |
+| Pin on top | Off | Keeps the app above other windows. |
+
+To change the hotkey, click the **pencil** beside the hotkey field, hold Ctrl, Alt, Shift, or Windows, and press another key. Escape cancels recording. Hover over the pencil to read hotkey registration feedback. Hotkey availability depends on whether Windows or another app already uses that combination.
+
+Settings apply to the current app session; version 0.1 does not persist them between launches. Each new Start begins typing from the start of the input text. Pause/Resume continues the current run.
+
+## How external typing behaves
+
+- Output always goes to the destination app; there is no separate preview mode.
+- A target foreground window is captured after the ready delay. If another window is foreground before the next simulated key, the run stops.
+- Key-down and key-up pairs are sent through Windows `SendInput`. Text uses Unicode input; Enter, Tab, Backspace, and correction arrows use their corresponding keys.
+- Held modifier keys suspend output so the start/pause hotkey does not turn simulated text into shortcuts.
+- Enter and Tab retain the destination application's behavior, which can include submitting text or moving focus.
+- Keep the destination caret and selection unchanged while typing. Automatic indentation, autocorrection, rich-text formatting, and changes of focus inside the same window can affect the result. A plain text editor is the most predictable destination.
+- Input into applications with higher privileges, protected fields, or applications that reject simulated input may be blocked.
+
+The app does not read text from the destination, record your physical typing, or synchronize text with a server. It maintains its own progress and cursor counts, so it cannot detect every transformation made by the destination editor.
+
+## Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| “Focus another app during the ready delay” | Click the destination text field before the countdown ends, or start with the hotkey while that field is focused. |
+| “Target app lost focus” | A different foreground window was detected. Starting again begins a new run from the start of the source text. |
+| Nothing is being typed | Release Ctrl/Alt/Shift/Windows; confirm the destination accepts simulated input and does not run with higher privileges. |
+| The hotkey does not work | Hover over the pencil for registration feedback and choose a different combination. |
+| Corrections land in the wrong place | Use a plain text field and avoid moving the caret, changing selection, or enabling automatic editor transformations. |
+| The app fails after renaming the EXE | Restore the filename `TypingPractice.exe`; WinUI uses it to resolve application resources. |
+| First launch takes longer | The single-file build extracts its bundled runtimes on first launch. |
+
+## Build from source
+
+Use Windows with the **.NET 10 SDK** and the Windows tooling required by WinUI 3 / Windows App SDK. The project references `Microsoft.WindowsAppSDK` 2.7.0. The release workflow uses a Windows runner with the .NET 10 SDK.
+
+```powershell
+git clone https://github.com/santa512/TypingPractice.git
+cd TypingPractice
+dotnet build TypingPractice.csproj -p:Platform=x64
+```
+
+### Build the single-file release
+
+```powershell
+dotnet publish TypingPractice.csproj -p:PublishProfile=SingleFile-x64 -c Release -p:Platform=x64
+Copy-Item dist\SingleFile-win-x64\TypingPractice.exe dist\TypingPractice.exe
+```
+
+Run `dist\TypingPractice.exe`. The profile bundles .NET and the Windows App SDK, compresses the payload, and extracts its content at launch. Trimming is disabled for WinUI compatibility.
+
+For a folder-based build, use `-p:PublishProfile=Portable-x64` instead. Keep every file in that publish folder together.
+
+### Repository layout
+
+| Path | Purpose |
+| --- | --- |
+| `MainWindow.xaml` | Window layout, input controls, compact status, and theme resources. |
+| `MainWindow.xaml.cs` | Typing rhythm, corrections, progress, global hotkey, title-bar colors, and pin behavior. |
+| `NativeKeyboard.cs` | Native keyboard input interop. |
+| `Assets/TypingPractice.ico` | App and executable icon. |
+| `scripts/New-AppIcon.ps1` | Recreates the multi-resolution icon. |
+| `Properties/PublishProfiles/` | Single-file and folder-based release profiles. |
+| `docs/` | Static GitHub Pages download site. |
+| `.github/workflows/` | Release publishing and GitHub Pages deployment. |
+| `release-notes/` | Notes attached to each release. |
+
+Build outputs, downloaded tooling, and local editor settings are excluded from Git. Executables are distributed as Release assets, rather than stored in source history.
+
+## Publish a new version
+
+1. Update the version in `TypingPractice.csproj` and the visible badge in `MainWindow.xaml`.
+2. Update this README, the download page, and `CHANGELOG.md`.
+3. Add `release-notes/vX.Y.md`.
+4. Push a matching `vX.Y` tag. The release workflow builds the EXE, generates its checksum, and attaches both to the GitHub Release.
+
+The Pages workflow deploys `docs/` when it changes on `main`. Configure **Settings → Pages → Source → GitHub Actions** for the repository.
+
+## Feedback
+
+[Open an issue](https://github.com/santa512/TypingPractice/issues) with the app version, Windows version, destination editor, and steps to reproduce. Use a short, non-sensitive sample of input text where necessary.
+
+See [CHANGELOG.md](CHANGELOG.md) for version history.
