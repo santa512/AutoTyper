@@ -48,10 +48,11 @@ byte[] encrypted = SharingSettingsStore.Protect(plain,true);
 Require(!encrypted.SequenceEqual(plain) && SharingSettingsStore.Protect(encrypted,false).SequenceEqual(plain),"Windows user encryption round trip");
 Require(!settings.ToString().Contains(settings.SecretAccessKey),"Settings description hides secrets");
 Require(new TypingSettings().DelaySeconds==3, "Default typing delay is three seconds");
-Require(new TypingSettings().GetHotkeys().Count==5, "Five global actions configured");
+Require(new TypingSettings().GetHotkeys().Count==6 && new TypingSettings().TranslateHotkey.Label=="Ctrl+Shift+T", "Six global actions with default translation shortcut");
 var legacy = System.Text.Json.JsonSerializer.Deserialize<TypingSettings>("{\"Pace\":1.3,\"DelaySeconds\":4}")!;
 Require(legacy.Pace==1.3 && legacy.DelaySeconds==4 && legacy.ScreenshotHotkey.Key==0x53,"Existing preferences gain new tool shortcuts without losing values");
 await Fail(()=>Task.Run(() => (new TypingSettings { ShareHotkey=new TypingSettings().ScreenshotHotkey }).Validate()));
+await Fail(()=>Task.Run(() => (new TypingSettings { TranslateHotkey=new TypingSettings().TextExtractHotkey }).Validate()));
 await Fail(()=>Task.Run(() => (new TypingSettings { ShareHotkey=new(0x4006,0x7b,"Ctrl+Shift+F12") }).Validate()));
 var registered = new Dictionary<int,HotkeyGesture>();
 uint? blockedKey=null;
@@ -75,13 +76,22 @@ Directory.CreateDirectory(testDir);
 string typingPath = Path.Combine(testDir,"typing.json"), historyPath = Path.Combine(testDir,"history.dat");
 try
 {
-    var options = new TypingSettings { Pace=1.7, Rhythm=0.8, MistakeChance=0.03, DelaySeconds=4, MinimizeToTray=true, HotkeyModifiers=0x4003,HotkeyKey=0x51,HotkeyLabel="Ctrl+Alt+Q" };
+    var options = new TypingSettings { Pace=1.7, Rhythm=0.8, MistakeChance=0.03, DelaySeconds=4, MinimizeToTray=true, HotkeyModifiers=0x4003,HotkeyKey=0x51,HotkeyLabel="Ctrl+Alt+Q", TranslateHotkey=new(0x4003,0x54,"Ctrl+Alt+T") };
     TypingSettingsStore.Save(options,typingPath);
     Require(TypingSettingsStore.Load(typingPath)==options,"Typing settings persist across reloads");
     await Fail(()=>Task.Run(()=>TypingSettingsStore.Save(options with { DelaySeconds=double.NaN },typingPath)));
     File.WriteAllText(typingPath,"{\"HotkeyModifiers\":16390,\"HotkeyKey\":83,\"HotkeyLabel\":\"Ctrl+Shift+S\",\"Pace\":1.4}");
     var migrated=TypingSettingsStore.Load(typingPath);
     Require(migrated.Pace==1.4 && migrated.HotkeyKey==83 && migrated.ScreenshotHotkey.Modifiers==0x4007,"Legacy shortcut collisions migrate without losing typing preferences");
+    string oldOptions = System.Text.Json.JsonSerializer.Serialize(options with { ShareHotkey = new(0x4006,0x54,"Ctrl+Shift+T") });
+    var oldNode = System.Text.Json.Nodes.JsonNode.Parse(oldOptions)!.AsObject();
+    oldNode.Remove("TranslateHotkey");
+    File.WriteAllText(typingPath,oldNode.ToJsonString());
+    var translatedOptions = TypingSettingsStore.Load(typingPath);
+    Require(translatedOptions.Pace==options.Pace && translatedOptions.ShareHotkey.Label=="Ctrl+Shift+T"
+        && translatedOptions.TranslateHotkey.Label=="Ctrl+Alt+Shift+T", "New translation shortcut avoids existing bindings without resetting preferences");
+    TypingSettingsStore.Save(translatedOptions,typingPath);
+    Require(TypingSettingsStore.Load(typingPath)==translatedOptions,"Migrated translation binding persists");
     File.WriteAllText(typingPath,"invalid-json");
     Require(TypingSettingsStore.Load(typingPath)==new TypingSettings(),"Corrupt typing settings recover to defaults");
     DateTimeOffset now = DateTimeOffset.UtcNow;
@@ -105,7 +115,30 @@ finally
 {
     File.Delete(typingPath); File.Delete(historyPath); Directory.Delete(testDir);
 }
-Console.WriteLine("All sharing, history and typing settings checks passed. No external uploads made.");
+var backup = new SettingsBundle(new TypingSettings { Pace=1.6, TranslateHotkey=new(0x4003,0x54,"Ctrl+Alt+T") },
+    settings, new TranslationSettings { ApiKey="test-translator-key-123456", Region="eastus", TargetLanguage="Japanese" });
+const string backupPassword = "test backup password";
+byte[] backupData = SettingsBackup.Export(backup, backupPassword);
+var restored = SettingsBackup.Import(backupData, backupPassword);
+Require(restored.Typing==backup.Typing && restored.Translation==backup.Translation
+    && restored.Sharing!.AccessKeyId==settings.AccessKeyId && restored.Sharing.SecretAccessKey==settings.SecretAccessKey
+    && restored.Sharing.BucketName==settings.BucketName, "Portable backup round trip preserves all API keys, preferences and hotkeys");
+Require(!Encoding.UTF8.GetString(backupData).Contains(settings.SecretAccessKey)
+    && !Encoding.UTF8.GetString(backupData).Contains(backup.Translation.ApiKey), "Export does not expose API keys as plaintext");
+Require(!backupData.SequenceEqual(SettingsBackup.Export(backup,backupPassword)), "Fresh export uses random salt and nonce");
+await Fail(()=>Task.Run(()=>SettingsBackup.Import(backupData,"wrong password")));
+await Fail(()=>Task.Run(()=>SettingsBackup.Export(backup,"short")));
+await Fail(()=>Task.Run(()=>SettingsBackup.Import([1,2,3],backupPassword)));
+await Fail(()=>Task.Run(()=>SettingsBackup.Import(new byte[SettingsBackup.MaximumFileBytes+1],backupPassword)));
+var damaged = System.Text.Json.Nodes.JsonNode.Parse(Encoding.UTF8.GetString(backupData))!.AsObject();
+byte[] cipher = Convert.FromBase64String(damaged["Ciphertext"]!.GetValue<string>());
+cipher[0] ^= 1;
+damaged["Ciphertext"] = Convert.ToBase64String(cipher);
+await Fail(()=>Task.Run(()=>SettingsBackup.Import(Encoding.UTF8.GetBytes(damaged.ToJsonString()),backupPassword)));
+var emptyBackup = new SettingsBundle(new TypingSettings(),null,new TranslationSettings());
+Require(SettingsBackup.Import(SettingsBackup.Export(emptyBackup,backupPassword),backupPassword)==emptyBackup,
+    "Unconfigured APIs round trip for clearing settings during import");
+Console.WriteLine("All sharing, history, settings, hotkey and encrypted backup checks passed. No external uploads made.");
 static void Require(bool value,string label) { if(!value) throw new Exception(label); Console.WriteLine("PASS: "+label); }
 static async Task Fail(Func<Task> action) { try { await action(); } catch(InvalidOperationException) { Console.WriteLine("PASS: Invalid settings/capture or failed upload rejected"); return; } throw new Exception("Expected failure"); }
 internal sealed class FakeHandler(Func<HttpRequestMessage,CancellationToken,Task<HttpResponseMessage>> send):HttpMessageHandler

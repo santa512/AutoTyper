@@ -23,7 +23,7 @@ jobs:
       - name: Check main-edition features
         shell: pwsh
         run: |
-          foreach ($project in @('QrDecoder.Tests', 'Screenshot.Tests', 'Ocr.Tests', 'Sharing.Tests', 'SingleInstance.Tests')) {
+          foreach ($project in @('QrDecoder.Tests', 'Screenshot.Tests', 'Ocr.Tests', 'Sharing.Tests', 'SingleInstance.Tests', 'Translation.Tests')) {
             dotnet run --project "tests/$project" -c Release
             if ($LASTEXITCODE -ne 0) { throw "$project failed." }
           }

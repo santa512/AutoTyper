@@ -11,5 +11,7 @@
     <Compile Include="..\..\TypingSettings.cs" Link="TypingSettings.cs" />
     <Compile Include="..\..\ShareHistory.cs" Link="ShareHistory.cs" />
     <Compile Include="..\..\GlobalHotkeys.cs" Link="GlobalHotkeys.cs" />
+    <Compile Include="..\..\TranslationSettings.cs" Link="TranslationSettings.cs" />
+    <Compile Include="..\..\SettingsBackup.cs" Link="SettingsBackup.cs" />
   </ItemGroup>
 </Project>

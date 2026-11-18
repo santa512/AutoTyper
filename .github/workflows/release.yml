@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag (for example v0.2)
+        description: Existing release tag (for example v0.2.1)
         required: true
-        default: v0.2
+        default: v0.2.1
       edition:
         description: Edition to build and publish
         type: choice
@@ -40,7 +40,7 @@ jobs:
         if: env.BUILD_EDITION != 'compact'
         shell: pwsh
         run: |
-          foreach ($project in @('QrDecoder.Tests', 'Screenshot.Tests', 'Ocr.Tests', 'Sharing.Tests', 'SingleInstance.Tests')) {
+          foreach ($project in @('QrDecoder.Tests', 'Screenshot.Tests', 'Ocr.Tests', 'Sharing.Tests', 'SingleInstance.Tests', 'Translation.Tests')) {
             dotnet run --project "tests/$project" -c Release
             if ($LASTEXITCODE -ne 0) { throw "$project failed." }
           }

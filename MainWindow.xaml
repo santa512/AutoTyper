@@ -23,7 +23,7 @@
                 <TextBlock Text="Auto Typer" FontSize="30" FontWeight="SemiBold" />
                 <Border Padding="8,3" CornerRadius="5" VerticalAlignment="Center"
                         Background="{ThemeResource SubtleFillColorSecondaryBrush}">
-                    <TextBlock Text="v0.2" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Text="v0.2.1" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </Border>
             </StackPanel>
             <TextBlock
@@ -75,12 +75,21 @@
                             Text="Edit this text, then press Start or use the selected hotkey."
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
-                        <Button x:Name="ClipboardButton" Grid.Column="1" VerticalAlignment="Center"
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <ComboBox x:Name="TranslationLanguage" Width="154" Height="36" MinHeight="36" VerticalAlignment="Center" AutomationProperties.Name="Translation language"
+                                  SelectionChanged="TranslationLanguage_SelectionChanged" ToolTipService.ToolTip="Translate clipboard text into this language" />
+                        <Button x:Name="TranslateButton" Width="36" Height="36" MinWidth="36" Padding="0" IsEnabled="False"
+                                Click="TranslateButton_Click" AutomationProperties.Name="Translate clipboard text"
+                                ToolTipService.ToolTip="Translate clipboard text with Microsoft Translator">
+                            <FontIcon Glyph="&#xF2B7;" FontSize="17" />
+                        </Button>
+                        <Button x:Name="ClipboardButton" VerticalAlignment="Center"
                                 Width="36" Height="36" MinWidth="36" Padding="0"
                                 Click="ClipboardButton_Click" AutomationProperties.Name="Paste from clipboard"
                                 ToolTipService.ToolTip="Paste from clipboard">
                             <FontIcon Glyph="&#xE77F;" FontSize="16" />
                         </Button>
+                        </StackPanel>
                     </Grid>
                     <TextBox
                         x:Name="SourceBox"
@@ -198,7 +207,7 @@
                                   VerticalAlignment="Center" Margin="8,0,0,0"
                                   OnContent="Copy result to clipboard" OffContent="Copy result to clipboard"
                                   AutomationProperties.Name="Copy result to clipboard"
-                                  ToolTipService.ToolTip="QR and Text Extract: also copy recognized text. Screenshot: copy image instead of Save As. Share: copies the public link." />
+                                  ToolTipService.ToolTip="QR and Text Extract: also copy recognized text. Translate: copy the original and translation. Screenshot: copy image instead of Save As. Share: copies the public link." />
                 </StackPanel>
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Bottom">
@@ -218,7 +227,8 @@
             </StackPanel>
         </Grid>
         </Grid>
-        <Grid x:Name="SharingPanel" Visibility="Collapsed" RowSpacing="20" ColumnSpacing="24">
+        <ContentControl x:Name="SharingPanel" Visibility="Collapsed" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+        <Grid RowSpacing="20" ColumnSpacing="24">
             <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
             <Grid.ColumnDefinitions><ColumnDefinition Width="168" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
             <TextBlock Grid.ColumnSpan="2" Text="Settings" FontSize="26" FontWeight="SemiBold" />
@@ -226,6 +236,8 @@
                 <ToggleButton x:Name="TypingSettingsTab" Content="Auto Typer" Tag="Typing" IsChecked="True" Click="SettingsSection_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
                 <ToggleButton x:Name="CloudSettingsTab" Content="Cloudflare bucket" Tag="Cloud" Click="SettingsSection_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
                 <ToggleButton x:Name="HotkeysSettingsTab" Content="Hotkeys" Tag="Hotkeys" Click="SettingsSection_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
+                <ToggleButton x:Name="TranslationSettingsTab" Content="Translation" Tag="Translation" Click="SettingsSection_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
+                <ToggleButton x:Name="BackupSettingsTab" Content="Export / Import" Tag="Backup" Click="SettingsSection_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
             </StackPanel>
             <ScrollViewer x:Name="SettingsScroller" Grid.Row="1" Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" ViewChanged="SettingsScroller_ViewChanged">
                 <StackPanel x:Name="SettingsSections" Spacing="24" Padding="0,0,16,16">
@@ -304,7 +316,7 @@
                         <TextBlock Text="Keys are encrypted for your Windows account and stored only on this PC. Keep the 14-day R2 lifecycle rule enabled for share/ uploads." TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
                     <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
-                    <StackPanel x:Name="HotkeysSettingsSection" Spacing="16" MinHeight="{Binding ActualHeight, ElementName=SettingsScroller}">
+                    <StackPanel x:Name="HotkeysSettingsSection" Spacing="16">
                         <TextBlock Text="Hotkeys" FontSize="20" FontWeight="SemiBold" />
                         <TextBlock Text="Global shortcuts work from other apps. Select the pencil, then press a combination. Changes apply when you save." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         <Grid ColumnSpacing="12">
@@ -337,7 +349,33 @@
                             <TextBox x:Name="TextExtractHotkeyInput" Grid.Column="1" IsReadOnly="True" KeyDown="HotkeyInput_KeyDown" AutomationProperties.Name="Text extract hotkey" />
                             <Button x:Name="TextExtractHotkeyButton" Grid.Column="2" Tag="Text Extract" Click="RecordHotkeyButton_Click" Width="36" Height="36" MinWidth="36" Padding="0" AutomationProperties.Name="Change Text extract hotkey" ToolTipService.ToolTip="Record hotkey"><FontIcon Glyph="&#xE70F;" FontSize="15" /></Button>
                         </Grid>
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="220" /><ColumnDefinition Width="36" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Instant translate from clipboard" VerticalAlignment="Center" TextWrapping="Wrap" />
+                            <TextBox x:Name="TranslateHotkeyInput" Grid.Column="1" IsReadOnly="True" KeyDown="HotkeyInput_KeyDown" AutomationProperties.Name="Instant translate from clipboard hotkey" />
+                            <Button x:Name="TranslateHotkeyButton" Grid.Column="2" Tag="Translate" Click="RecordHotkeyButton_Click" Width="36" Height="36" MinWidth="36" Padding="0" AutomationProperties.Name="Change Instant translate from clipboard hotkey" ToolTipService.ToolTip="Record hotkey"><FontIcon Glyph="&#xE70F;" FontSize="15" /></Button>
+                        </Grid>
+                        <TextBlock Text="Instant translate requires Microsoft Translator API settings. Its shortcut activates after configuration is saved." TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         <TextBlock x:Name="HotkeyStatusText" TextWrapping="Wrap" FontSize="12" AutomationProperties.LiveSetting="Polite" />
+                    </StackPanel>
+                    <StackPanel x:Name="TranslationSettingsSection" Spacing="16">
+                        <TextBlock Text="Translation" FontSize="20" FontWeight="SemiBold" />
+                        <TextBlock Text="Translate clipboard text with Microsoft Translator. The original and translation appear together in the text box. Choose the target language beside the translate button; English is the default." TextWrapping="Wrap" />
+                        <PasswordBox x:Name="TranslationApiKey" Header="Microsoft Translator API key" PasswordRevealMode="Peek" />
+                        <HyperlinkButton Content="Set up Microsoft Translator in Azure" NavigateUri="https://portal.azure.com/#create/Microsoft.CognitiveServicesTextTranslation" HorizontalAlignment="Left" />
+                        <TextBox x:Name="TranslationRegion" Header="Azure resource region" PlaceholderText="e.g. eastus — leave blank for a global Translator resource" />
+                        <TextBlock Text="Copy the key and region from your Azure resource's Keys and Endpoint page. Regional and multi-service resources require their region; global Translator resources can leave it blank. Save to enable the translate button. Clearing the key disables it. The saved key is encrypted for your Windows account. Clicking Translate sends clipboard text to Microsoft; internet access and API quota are required." TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                    <StackPanel x:Name="BackupSettingsSection" Spacing="16">
+                        <TextBlock Text="Export / Import" FontSize="20" FontWeight="SemiBold" />
+                        <TextBlock Text="Back up typing preferences, all hotkeys, Cloudflare settings and keys, and Microsoft Translator settings and API key. Use the same password when importing on another PC." TextWrapping="Wrap" />
+                        <PasswordBox x:Name="BackupPassword" Header="Backup password (at least 8 characters)" PasswordRevealMode="Peek" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="ExportSettingsButton" Content="Export settings" Click="ExportSettings_Click" />
+                            <Button x:Name="ImportSettingsButton" Content="Import settings" Click="ImportSettings_Click" />
+                        </StackPanel>
+                        <TextBlock Text="Exports are encrypted and include the values currently entered in Settings. Import loads the backup for review; Save applies it, and Back lets you discard it. Keep the password: it cannot be recovered." TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock x:Name="BackupStatusText" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>
@@ -357,6 +395,7 @@
                 </StackPanel>
             </StackPanel>
         </Grid>
+        </ContentControl>
         </Grid>
     </Border>
     <Grid

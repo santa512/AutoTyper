@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(AutoTyperCompact VERSION 0.2.0 LANGUAGES CXX RC)
+project(AutoTyperCompact VERSION 0.2.1 LANGUAGES CXX RC)
 
 if(NOT WIN32)
     message(FATAL_ERROR "Auto Typer Compact requires a Windows toolchain.")

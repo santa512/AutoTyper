@@ -16,11 +16,12 @@ internal sealed record TypingSettings
     public HotkeyGesture ShareHotkey { get; init; } = new(0x4006, 0x49, "Ctrl+Shift+I");
     public HotkeyGesture QrHotkey { get; init; } = new(0x4006, 0x51, "Ctrl+Shift+Q");
     public HotkeyGesture TextExtractHotkey { get; init; } = new(0x4006, 0x45, "Ctrl+Shift+E");
+    public HotkeyGesture TranslateHotkey { get; init; } = new(0x4006, 0x54, "Ctrl+Shift+T");
 
     internal Dictionary<string, HotkeyGesture> GetHotkeys() => new()
     {
         ["Typing"] = new(HotkeyModifiers, HotkeyKey, HotkeyLabel), ["Screenshot"] = ScreenshotHotkey,
-        ["Share"] = ShareHotkey, ["QR"] = QrHotkey, ["Text Extract"] = TextExtractHotkey
+        ["Share"] = ShareHotkey, ["QR"] = QrHotkey, ["Text Extract"] = TextExtractHotkey, ["Translate"] = TranslateHotkey
     };
 
     internal void Validate()
@@ -61,6 +62,18 @@ internal static class TypingSettingsStore
                     ScreenshotHotkey = AvoidTypingConflict(settings.ScreenshotHotkey), ShareHotkey = AvoidTypingConflict(settings.ShareHotkey),
                     QrHotkey = AvoidTypingConflict(settings.QrHotkey), TextExtractHotkey = AvoidTypingConflict(settings.TextExtractHotkey)
                 };
+            }
+            if (!document.RootElement.TryGetProperty(nameof(TypingSettings.TranslateHotkey), out _))
+            {
+                var existing = settings.GetHotkeys().Where(entry => entry.Key != "Translate").Select(entry => entry.Value).ToArray();
+                var candidates = new[]
+                {
+                    new HotkeyGesture(0x4006, 0x54, "Ctrl+Shift+T"), new(0x4007, 0x54, "Ctrl+Alt+Shift+T"),
+                    new(0x4005, 0x54, "Alt+Shift+T"), new(0x4003, 0x54, "Ctrl+Alt+T"),
+                    new(0x4002, 0x54, "Ctrl+T"), new(0x4001, 0x54, "Alt+T")
+                };
+                settings = settings with { TranslateHotkey = candidates.First(candidate =>
+                    !existing.Any(key => key is not null && key.Key == candidate.Key && (key.Modifiers & 0xf) == (candidate.Modifiers & 0xf))) };
             }
             settings.Validate();
             return settings;
