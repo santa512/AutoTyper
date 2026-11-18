@@ -34,7 +34,7 @@ foreach ($name in @('AutoTyper','AutoTyperCompact')) {
         if ($process.ExitCode -notin @(0,3010)) { throw "Uninstall failed: $($process.ExitCode)" }
     }
     if ((Test-Path -LiteralPath $installed) -or (Test-Path -LiteralPath $shortcut)) { throw 'Uninstall left its executable or shortcut behind.' }
-    if ($name -eq 'AutoTyper' -and (Get-ItemPropertyValue -Path $runKey -Name AutoTyper -ErrorAction SilentlyContinue)) { throw 'Uninstall left its startup entry behind.' }
+    if ($name -eq 'AutoTyper' -and (Get-Item -LiteralPath $runKey).GetValue('AutoTyper')) { throw 'Uninstall left its startup entry behind.' }
     Write-Output "PASS: $name $Architecture PE architecture, install, shortcut, file integrity and uninstall."
 }
 foreach ($asset in Get-ChildItem -LiteralPath $assets -File | Where-Object { $_.Extension -in @('.exe','.msi') }) {

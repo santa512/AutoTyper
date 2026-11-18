@@ -8,6 +8,12 @@ $root = Split-Path $PSScriptRoot -Parent
 Push-Location $root
 try {
     $platform = if ($Architecture -eq 'arm64') { 'ARM64' } else { 'x64' }
+    $machine = if ($Architecture -eq 'arm64') { 0xaa64 } else { 0x8664 }
+    foreach ($runtime in Get-ChildItem -LiteralPath "Assets/OcrRuntime/$Architecture" -Filter '*.dll') {
+        $bytes = [IO.File]::ReadAllBytes($runtime.FullName)
+        $header = [BitConverter]::ToInt32($bytes, 0x3c)
+        if ([BitConverter]::ToUInt16($bytes, $header + 4) -ne $machine) { throw "Wrong OCR runtime architecture: $($runtime.Name)" }
+    }
     $work = Join-Path $root "dist/build-$Architecture"
     $assets = Join-Path $root "dist/release-$Architecture"
     New-Item -ItemType Directory -Path $assets -Force | Out-Null
