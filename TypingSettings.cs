@@ -9,6 +9,7 @@ internal sealed record TypingSettings
     public double MistakeChance { get; init; } = 0.01;
     public double DelaySeconds { get; init; } = 3;
     public bool MinimizeToTray { get; init; }
+    public bool RunOnStartup { get; init; }
     public uint HotkeyModifiers { get; init; } = 0x4006;
     public uint HotkeyKey { get; init; } = 0x20;
     public string HotkeyLabel { get; init; } = "Ctrl+Shift+Space";

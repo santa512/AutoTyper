@@ -23,7 +23,7 @@
                 <TextBlock Text="Auto Typer" FontSize="30" FontWeight="SemiBold" />
                 <Border Padding="8,3" CornerRadius="5" VerticalAlignment="Center"
                         Background="{ThemeResource SubtleFillColorSecondaryBrush}">
-                    <TextBlock Text="v0.2.1" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Text="v0.2.2" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </Border>
             </StackPanel>
             <TextBlock
@@ -295,6 +295,8 @@
                     <ToggleSwitch x:Name="MinimizeToTrayToggle" Header="Minimize to tray" OnContent="Enabled" OffContent="Disabled" />
                     <TextBlock Text="Keep Auto Typer and its global hotkeys running when minimized or closed. Use Exit in the tray menu to quit."
                                FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <ToggleSwitch x:Name="RunOnStartupToggle" Header="Run on startup" OnContent="Enabled" OffContent="Disabled" />
+                    <TextBlock Text="Start Auto Typer when you sign in to Windows. If Minimize to tray is enabled, startup opens in the tray. Keep portable copies in a permanent location." FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 
                     </StackPanel>
                     <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />

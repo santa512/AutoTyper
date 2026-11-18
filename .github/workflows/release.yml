@@ -1,91 +1,54 @@
 name: Build Auto Typer release
-
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag (for example v0.2.1)
+        description: Existing release tag (for example v0.2.2)
         required: true
-        default: v0.2.1
+        default: v0.2.2
       edition:
         description: Edition to build and publish
         type: choice
         options: [both, winui, compact]
         default: both
-
 permissions:
-  contents: write
-
+  contents: read
 jobs:
+  build:
+    uses: ./.github/workflows/build-platforms.yml
+    with:
+      source-ref: ${{ inputs.tag || github.ref_name }}
+      edition: ${{ inputs.edition || 'both' }}
   release:
-    runs-on: windows-2025
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
-      BUILD_EDITION: ${{ inputs.edition || 'both' }}
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ env.RELEASE_TAG }}
-      - uses: actions/setup-dotnet@v5
-        if: env.BUILD_EDITION != 'compact'
+      - uses: actions/download-artifact@v7
         with:
-          dotnet-version: '10.0.x'
-      - name: Publish self-contained executable
-        if: env.BUILD_EDITION != 'compact'
-        shell: pwsh
-        run: dotnet publish AutoTyper.csproj -p:PublishProfile=SingleFile-x64 -c Release -p:Platform=x64
-      - name: Check main-edition features
-        if: env.BUILD_EDITION != 'compact'
-        shell: pwsh
+          pattern: release-*
+          merge-multiple: true
+          path: dist/release
+      - name: Publish verified downloads
+        shell: bash
         run: |
-          foreach ($project in @('QrDecoder.Tests', 'Screenshot.Tests', 'Ocr.Tests', 'Sharing.Tests', 'SingleInstance.Tests', 'Translation.Tests')) {
-            dotnet run --project "tests/$project" -c Release
-            if ($LASTEXITCODE -ne 0) { throw "$project failed." }
-          }
-      - name: Build and test compact edition
-        if: env.BUILD_EDITION != 'winui'
-        shell: pwsh
-        run: |
-          cmake -S native -B native/build -A x64 -DBUILD_TESTING=ON
-          if ($LASTEXITCODE -ne 0) { throw 'Compact configuration failed.' }
-          cmake --build native/build --config Release
-          if ($LASTEXITCODE -ne 0) { throw 'Compact build failed.' }
-          ctest --test-dir native/build -C Release --output-on-failure
-          if ($LASTEXITCODE -ne 0) { throw 'Compact tests failed.' }
-          New-Item -ItemType Directory -Path native/dist -Force | Out-Null
-          Copy-Item native/build/Release/AutoTyperCompact.exe native/dist/AutoTyperCompact.exe
-      - name: Checksum
-        shell: pwsh
-        run: |
-          $executables = @()
-          if ($env:BUILD_EDITION -ne 'compact') { $executables += 'dist/SingleFile-win-x64/AutoTyper.exe' }
-          if ($env:BUILD_EDITION -ne 'winui') { $executables += 'native/dist/AutoTyperCompact.exe' }
-          foreach ($exe in $executables) {
-            $hash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
-            "$hash  $(Split-Path -Leaf $exe)" | Set-Content -LiteralPath "$exe.sha256" -Encoding ascii
-          }
-      - name: Publish GitHub release
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $notesPath = Join-Path $env:RUNNER_TEMP 'auto-typer-release-notes.md'
-          Copy-Item "release-notes/$env:RELEASE_TAG.md" $notesPath
-          Add-Content -LiteralPath $notesPath -Value "`nBuild source: https://github.com/${{ github.repository }}/tree/${{ github.sha }}"
-          gh release view $env:RELEASE_TAG *> $null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create $env:RELEASE_TAG --verify-tag --draft --title "Auto Typer $env:RELEASE_TAG" --notes-file $notesPath
-            if ($LASTEXITCODE -ne 0) { throw 'Could not create release.' }
-          } else {
-            gh release edit $env:RELEASE_TAG --title "Auto Typer $env:RELEASE_TAG" --notes-file $notesPath
-            if ($LASTEXITCODE -ne 0) { throw 'Could not update release.' }
-          }
-          $assets = @()
-          if ($env:BUILD_EDITION -ne 'compact') { $assets += 'dist/SingleFile-win-x64/AutoTyper.exe', 'dist/SingleFile-win-x64/AutoTyper.exe.sha256' }
-          if ($env:BUILD_EDITION -ne 'winui') { $assets += 'native/dist/AutoTyperCompact.exe', 'native/dist/AutoTyperCompact.exe.sha256' }
-          gh release upload $env:RELEASE_TAG @assets --clobber
-          if ($LASTEXITCODE -ne 0) { throw 'Could not upload release assets.' }
-          gh release edit $env:RELEASE_TAG --draft=false --latest
-          if ($LASTEXITCODE -ne 0) { throw 'Could not publish the completed release.' }
+          set -euo pipefail
+          cd dist/release
+          sha256sum --check --strict ./*.sha256
+          cd ../..
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --verify-tag --draft --title "Auto Typer $RELEASE_TAG" --notes-file "release-notes/$RELEASE_TAG.md"
+          else
+            gh release edit "$RELEASE_TAG" --notes-file "release-notes/$RELEASE_TAG.md"
+          fi
+          gh release upload "$RELEASE_TAG" dist/release/*.exe dist/release/*.msi dist/release/*.sha256 --clobber
+          gh release edit "$RELEASE_TAG" --draft=false --latest

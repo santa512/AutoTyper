@@ -1,6 +1,7 @@
-Microsoft Visual C++ v14 runtime, x64, version 14.52.37029.0
+Microsoft Visual C++ v14 runtime, x64 and ARM64, version 14.52.37029.0
 Copyright Microsoft Corporation. All rights reserved.
 Source: https://aka.ms/vc14/vc_redist.x64.exe
 License terms: https://aka.ms/VCRedistLicense
 These unmodified Microsoft-signed redistributable DLLs were extracted from the signed installer. No system runtime was installed.
-Files: msvcp140.dll, vcruntime140.dll, vcruntime140_1.dll, vcruntime140_threads.dll
+Both architectures: concrt140.dll, msvcp140.dll, msvcp140_1.dll, msvcp140_2.dll, msvcp140_atomic_wait.dll, msvcp140_codecvt_ids.dll, vcruntime140.dll, vcruntime140_threads.dll.
+x64 additionally: vcruntime140_1.dll. The redistributable's nominal arm64 copy of this file is actually x64 and is not used by native ARM64 OCR.

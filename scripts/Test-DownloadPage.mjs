@@ -8,7 +8,9 @@ const tag = `v${version}`;
 const html = fs.readFileSync(new URL('../docs/index.html', import.meta.url), 'utf8');
 const script = fs.readFileSync(new URL('../docs/release.js', import.meta.url), 'utf8');
 const readme = fs.readFileSync(new URL('../README.md', import.meta.url), 'utf8');
-const assets = ['AutoTyper.exe', 'AutoTyper.exe.sha256', 'AutoTyperCompact.exe', 'AutoTyperCompact.exe.sha256'];
+const files = ['AutoTyper.exe', 'AutoTyper-arm64.exe', 'AutoTyperCompact.exe', 'AutoTyperCompact-arm64.exe',
+  'AutoTyper-Setup-x64.msi', 'AutoTyper-Setup-arm64.msi', 'AutoTyperCompact-Setup-x64.msi', 'AutoTyperCompact-Setup-arm64.msi'];
+const assets = files.flatMap(name => [name, `${name}.sha256`]);
 const downloads = [...html.matchAll(/href="https:\/\/github.com\/santa512\/AutoTyper\/releases\/download\/([^/]+)\/([^"?#]+)"/g)];
 assert(downloads.length >= 4, 'Both editions and checksums have direct download links');
 for (const [, actualTag, asset] of downloads) {
@@ -24,6 +26,7 @@ assert(!/\bWinUI\b|\bWin32\b/i.test(html), 'Public page uses edition names');
 assert(html.indexOf('/AutoTyper.exe"') < html.indexOf('/AutoTyperCompact.exe"'), 'Main app is the default download');
 assert(/14 days/.test(html) && /tray/i.test(html) && /English/.test(html), 'Current features are documented');
 assert(/Microsoft Translator/.test(html) && /encrypted backup/.test(html) && /Six global shortcuts/.test(html), 'Translation, backup and sixth hotkey are documented');
+assert(/ARM64/.test(html) && /Run on startup/.test(html) && /Setup MSI/.test(html), 'Architectures, startup and setup downloads are documented');
 assert(!/\b(?:MiB|KiB)\b/.test(html + readme), 'Public download sizes use decimal units');
 assert(html.includes('114.1 MB') && html.includes('238.6 KB'), 'Offline sizes match the published assets');
 

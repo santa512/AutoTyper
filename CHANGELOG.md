@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.2 — 2026-11-18
+
+- Add native ARM64 builds for the recommended app and Compact, alongside x64. Bundle architecture-matched OCR runtime DLLs and retain offline English OCR on ARM64.
+- Add per-user MSI setup installers with Start menu shortcuts, upgrade support and uninstall support for both editions and architectures. Keep portable EXEs available; all downloads include checksums.
+- Add Run on startup under Auto Typer settings, off by default. Startup follows the current EXE location, opens in the tray when enabled, and is included in settings backups. Uninstall removes the installed app's startup entry.
+- Build, test OCR, verify PE architecture, install and uninstall on native x64 and ARM64 GitHub runners before publishing.
+- Add architecture and installer choices to the download page and concise README.
+
 ## 0.2.1 — 2026-11-18
 
 - Add a configurable global clipboard translation hotkey (Ctrl+Shift+T by default), active after Microsoft Translator setup, with conflict-safe preference migration.

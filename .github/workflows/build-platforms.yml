@@ -1,0 +1,65 @@
+name: Build Windows packages
+on:
+  workflow_call:
+    inputs:
+      source-ref:
+        type: string
+        default: ''
+      edition:
+        type: string
+        default: both
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-2025
+          - arch: arm64
+            runner: windows-11-arm
+    runs-on: ${{ matrix.runner }}
+    env:
+      DOTNET_ROLL_FORWARD: Major
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source-ref || github.ref }}
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install pinned installer build tool
+        shell: pwsh
+        run: dotnet tool install --tool-path .tools/wix wix --version 6.0.2
+      - name: Build portable apps and setup installers
+        shell: pwsh
+        run: ./scripts/Build-Release.ps1 -Architecture '${{ matrix.arch }}' -Edition '${{ inputs.edition }}'
+      - name: Check main-edition features on target architecture
+        if: inputs.edition != 'compact'
+        shell: pwsh
+        run: |
+          foreach ($project in @('QrDecoder.Tests', 'Screenshot.Tests', 'Ocr.Tests', 'Sharing.Tests', 'SingleInstance.Tests', 'Translation.Tests')) {
+            dotnet run --project "tests/$project" -c Release -r 'win-${{ matrix.arch }}'
+            if ($LASTEXITCODE -ne 0) { throw "$project failed on ${{ matrix.arch }}." }
+          }
+      - name: Verify architecture, installer and uninstaller
+        if: inputs.edition == 'both'
+        shell: pwsh
+        run: ./scripts/Test-Packages.ps1 -Architecture '${{ matrix.arch }}'
+      - name: Check download page
+        shell: pwsh
+        run: |
+          node --check docs/release.js
+          if ($LASTEXITCODE -ne 0) { throw 'Download script syntax failed.' }
+          node scripts/Test-DownloadPage.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'Download page checks failed.' }
+      - uses: actions/upload-artifact@v6
+        with:
+          name: release-${{ matrix.arch }}
+          path: |
+            dist/release-${{ matrix.arch }}/*.exe
+            dist/release-${{ matrix.arch }}/*.msi
+            dist/release-${{ matrix.arch }}/*.sha256
+          if-no-files-found: error

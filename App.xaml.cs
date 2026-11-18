@@ -15,6 +15,12 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        if (Environment.GetCommandLineArgs().Contains("--remove-startup"))
+        {
+            StartupRegistration.RemoveIfMatchingExecutable();
+            Exit();
+            return;
+        }
         _instance = new SingleInstance();
         if (!_instance.EnterOrActivateExisting())
         {
@@ -45,5 +51,7 @@ public partial class App : Application
             _instance = null;
         };
         _window.Activate();
+        if (Environment.GetCommandLineArgs().Contains("--startup") && _window is MainWindow main)
+            _window.DispatcherQueue.TryEnqueue(main.StartFromWindowsLogin);
     }
 }

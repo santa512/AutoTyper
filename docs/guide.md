@@ -1,19 +1,19 @@
 # Auto Typer — Detailed guide
 
-**Version 0.2.1** · Windows desktop · x64
+**Version 0.2.2** · Windows desktop · x64
 
 Type into other apps with a natural rhythm, capture screenshots, scan QR codes, extract English text offline, and share screenshot links. Global shortcuts and optional tray mode keep the tools within reach.
 
-**[Download Auto Typer](https://santa512.github.io/AutoTyper/#downloads)** · **[v0.2.1 release](https://github.com/santa512/AutoTyper/releases/tag/v0.2.1)** · **[Changelog](../CHANGELOG.md)**
+**[Download Auto Typer](https://santa512.github.io/AutoTyper/#downloads)** · **[v0.2.2 release](https://github.com/santa512/AutoTyper/releases/tag/v0.2.2)** · **[Changelog](../CHANGELOG.md)**
 
 ## Choose your download
 
-Both editions are version 0.2.1 for Windows x64. The recommended download includes the screen tools and tray features. Compact keeps the smaller typing-focused interface.
+Both editions are version 0.2.2 for Windows x64 and ARM64. The recommended download includes the screen tools and tray features. Compact keeps the smaller typing-focused interface.
 
 | Edition | Download | Size | Included |
 | --- | --- | --- | --- |
-| **Auto Typer — recommended** | [AutoTyper.exe](https://github.com/santa512/AutoTyper/releases/download/v0.2.1/AutoTyper.exe) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.2.1/AutoTyper.exe.sha256) | About 114.1 MB | Typing, clipboard paste, QR scanning, English OCR, screenshot save/copy, R2 sharing and history, clipboard translation, six global hotkeys, encrypted settings backups, single-instance behavior and tray mode. |
-| **Auto Typer Compact** | [AutoTyperCompact.exe](https://github.com/santa512/AutoTyper/releases/download/v0.2.1/AutoTyperCompact.exe) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.2.1/AutoTyperCompact.exe.sha256) | Under 1 MB | A lighter typing app with clipboard paste, natural rhythm, corrections, highlighting, a global typing hotkey and pin on top. No screen tools, OCR, sharing or tray menu. |
+| **Auto Typer — recommended** | [AutoTyper.exe](https://github.com/santa512/AutoTyper/releases/download/v0.2.2/AutoTyper.exe) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.2.2/AutoTyper.exe.sha256) | About 114.1 MB | Typing, clipboard paste, QR scanning, English OCR, screenshot save/copy, R2 sharing and history, clipboard translation, six global hotkeys, encrypted settings backups, single-instance behavior and tray mode. |
+| **Auto Typer Compact** | [AutoTyperCompact.exe](https://github.com/santa512/AutoTyper/releases/download/v0.2.2/AutoTyperCompact.exe) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.2.2/AutoTyperCompact.exe.sha256) | Under 1 MB | A lighter typing app with clipboard paste, natural rhythm, corrections, highlighting, a global typing hotkey and pin on top. No screen tools, OCR, sharing or tray menu. |
 
 The guide below describes the recommended app; see the [Compact guide](../native/README.md) for its usage and build instructions. Run one edition at a time to avoid conflicts between their typing shortcuts. Single-instance behavior applies to copies of the recommended app; Compact remains a separate application.
 
@@ -25,12 +25,12 @@ The guide below describes the recommended app; see the [Compact guide](../native
 
 Only your chosen EXE is needed; the checksum is optional verification. Do not download the source ZIP to run the app. The main download is about 114.1 MB because it bundles its runtimes and offline OCR. Compact is under 1 MB and uses Windows system components directly.
 
-**Upgrading:** choose **Exit** in the old tray menu before starting v0.2.1. Closing a tray-enabled window only hides it. Existing compatible settings and local sharing history are retained. These executables are unsigned, so Windows may show an unknown-publisher or reputation prompt.
+**Upgrading:** choose **Exit** in the old tray menu before starting v0.2.2. Closing a tray-enabled window only hides it. Existing compatible settings and local sharing history are retained. These executables are unsigned, so Windows may show an unknown-publisher or reputation prompt.
 
 ### Requirements
 
 - Windows 10 version 1809 or later, or Windows 11.
-- An x64 computer. Version 0.2.1 does not ship separate x86 or ARM64 binaries.
+- An x64 or ARM64 computer. Choose the matching architecture; 32-bit Windows is not supported.
 - A destination application that accepts simulated Windows keyboard input.
 
 ### Verify the download
@@ -89,6 +89,14 @@ Right-click the tray icon for **Main**, **QR code**, **OCR / Text extract**, **S
 
 Turning the option off removes the tray icon and restores normal Minimize/Close behavior. Auto Typer recreates the icon if Explorer restarts and keeps the window on the taskbar if icon creation fails. This option does not add Windows startup registration.
 
+## Run on startup
+
+Enable **Settings → Auto Typer → Run on startup**, then Save. This is off by default and registers the current EXE for your Windows account at sign-in. If Minimize to tray is enabled, it starts in the tray. Disabling it removes the registration. Keep portable copies in a permanent folder and save the setting again if you move the EXE. The preference is included in encrypted settings backups; importing and saving uses the receiving PC's EXE path.
+
+## Setup installers
+
+Choose a matching x64 or ARM64 `.msi` from the download page. Setup installs for the current user under `%LOCALAPPDATA%\Programs\AutoTyper` (or `AutoTyperCompact`), adds a Start menu shortcut and supports uninstall through Windows Installed apps. No administrator account is required. Uninstall removes an installed app's matching startup entry while retaining your preferences and share history. Close the old app with Exit before upgrading.
+
 ## Screen-region tools
 
 The main edition includes icon buttons for **Scan QR code**, **Text Extract**, and **Screenshot** at the bottom left, plus **Paste from clipboard** beside the input heading. Hover over each icon for its name. Click a screen tool, then drag across the desktop to select a rectangle. The app hides during selection. Drag in any direction; Escape, right-click, or switching apps cancels. These tools are disabled while typing.
@@ -105,7 +113,7 @@ After a successful save or copy, Auto Typer sends a **Windows notification** wit
 
 The app normalizes dark and low-contrast regions and enlarges small text before recognition. Low-contrast input or uncertain character scores show a review hint. Tiny punctuation, blur, unusual fonts, and complicated layouts can still cause mistakes—even when the model's confidence is high. Review important text before typing it into another app. Recognition is currently configured for English only; the Compact edition is unchanged.
 
-OCR model sources, versions, checksums, and license notices are included under `Assets/OCR/`. Small notification previews are the only screenshot images cached to disk; OCR processes its selected region in memory. The v0.2.1 main download bundles the inference engine and models, so it is larger than v0.1. No model downloads are needed at runtime.
+OCR model sources, versions, checksums, and license notices are included under `Assets/OCR/`. Small notification previews are the only screenshot images cached to disk; OCR processes its selected region in memory. The v0.2.2 main download bundles the inference engine and models, so it is larger than v0.1. No model downloads are needed at runtime.
 
 ### Share screenshots to R2
 
@@ -235,3 +243,8 @@ The Pages workflow deploys `docs/` when it changes on `main`. Configure **Settin
 [Open an issue](https://github.com/santa512/AutoTyper/issues) with the app version, Windows version, destination editor, and steps to reproduce. Use a short, non-sensitive sample of input text where necessary.
 
 See [CHANGELOG.md](../CHANGELOG.md) for version history.
+
+
+## Build all release packages
+
+Install WiX with `dotnet tool install --tool-path .tools/wix wix --version 6.0.2`, then run `./scripts/Build-Release.ps1 -Architecture x64` or `-Architecture arm64` from PowerShell on a matching Windows build host with .NET 10 and Visual Studio C++ tools. The scripts produce portable EXEs, per-user MSI installers and checksums under `dist/release-<architecture>`. CI uses native runners to test each architecture, including OCR and install/uninstall.

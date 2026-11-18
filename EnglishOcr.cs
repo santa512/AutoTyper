@@ -101,8 +101,9 @@ internal static class EnglishOcr
         // All content is extracted beside these assemblies by the single-file publish profile.
         string directory = Path.GetDirectoryName(typeof(EnglishOcr).Assembly.Location)
             is { Length: > 0 } path ? path : AppContext.BaseDirectory;
-        foreach (string name in new[] { "vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll" })
-            NativeLibrary.Load(Path.Combine(directory, "x64", name), typeof(EnglishOcr).Assembly,
+        string architecture = RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant();
+        foreach (string runtime in Directory.EnumerateFiles(Path.Combine(directory, architecture), "*.dll"))
+            NativeLibrary.Load(runtime, typeof(EnglishOcr).Assembly,
                 DllImportSearchPath.UseDllDirectoryForDependencies | DllImportSearchPath.SafeDirectories);
         string models = Path.Combine(directory, "Assets", "OCR");
         var engine = new RapidOcr();
