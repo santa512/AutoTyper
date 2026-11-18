@@ -429,6 +429,7 @@ public sealed partial class MainWindow : Window
             if (hasCloudSettings || _sharingRequired) settings.Validate();
             if (_windowSubclassed && _globalHotkeys?.TryApply(BuildHotkeyRegistrations(typing.GetHotkeys(), translation.IsConfigured)) == false)
                 throw new InvalidOperationException($"Could not register {_globalHotkeys.FailedAction}. Choose another shortcut in Hotkeys; another app may be using it.");
+            StartupRegistration.Apply(typing.RunOnStartup);
             if (hasCloudSettings || _sharingRequired) SharingSettingsStore.Save(settings);
             else SharingSettingsStore.Clear();
             TypingSettingsStore.Save(typing);
@@ -441,7 +442,7 @@ public sealed partial class MainWindow : Window
             _sharingCompletion?.TrySetResult(hasCloudSettings ? settings : null);
         }
         catch (Exception exception) when (exception is InvalidOperationException or IOException
-            or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+            or UnauthorizedAccessException or System.Security.SecurityException or System.ComponentModel.Win32Exception)
         {
             _globalHotkeys?.Release();
             SharingError.Text = exception is InvalidOperationException ? exception.Message : "Could not save settings. Try again.";
@@ -519,6 +520,7 @@ public sealed partial class MainWindow : Window
             MistakeSlider.Value = typing.MistakeChance;
             ReadyDelayBox.Value = typing.DelaySeconds;
             MinimizeToTrayToggle.IsOn = typing.MinimizeToTray;
+            RunOnStartupToggle.IsOn = typing.RunOnStartup;
             _draftHotkeys = typing.GetHotkeys();
             UpdateHotkeyLabels();
             var cloud = bundle.Sharing ?? new SharingSettings();
@@ -548,6 +550,11 @@ public sealed partial class MainWindow : Window
         if (!_isClosing && !_isSelectingRegion) ActivateExistingWindow();
     }
 
+    internal void StartFromWindowsLogin()
+    {
+        if (_minimizeToTray) HideToTray();
+    }
+
     private void ActivateExistingWindow()
     {
         if (_isClosing) return;
@@ -564,6 +571,7 @@ public sealed partial class MainWindow : Window
         {
             Pace = PaceSlider.Value, Rhythm = RhythmSlider.Value, MistakeChance = MistakeSlider.Value,
             MinimizeToTray = MinimizeToTrayToggle.IsOn,
+            RunOnStartup = RunOnStartupToggle.IsOn,
             DelaySeconds = ReadyDelayBox.Value, HotkeyModifiers = keys["Typing"].Modifiers,
             HotkeyKey = keys["Typing"].Key, HotkeyLabel = keys["Typing"].Label,
             ScreenshotHotkey = keys["Screenshot"], ShareHotkey = keys["Share"],
@@ -578,6 +586,7 @@ public sealed partial class MainWindow : Window
         MistakeSlider.Value = settings.MistakeChance;
         ReadyDelayBox.Value = settings.DelaySeconds;
         MinimizeToTrayToggle.IsOn = _minimizeToTray = settings.MinimizeToTray;
+        RunOnStartupToggle.IsOn = settings.RunOnStartup;
         _activeHotkeys = settings.GetHotkeys();
         _draftHotkeys = new(_activeHotkeys);
         UpdateHotkeyLabels();
@@ -806,7 +815,7 @@ public sealed partial class MainWindow : Window
         _translationSettings = TranslationSettingsStore.Load();
         TranslationLanguage.ItemsSource = TranslationSettings.Languages;
         TranslationLanguage.SelectedItem = _translationSettings.TargetLanguage;
-        ApplyTypingSettings(TypingSettingsStore.Load());
+        ApplyTypingSettings(TypingSettingsStore.Load() with { RunOnStartup = StartupRegistration.IsEnabled });
         _sharingSettings = SharingSettingsStore.Load();
         SetRegionToolsEnabled(true);
         RegisterGlobalHotkey();

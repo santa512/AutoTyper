@@ -115,7 +115,15 @@ finally
 {
     File.Delete(typingPath); File.Delete(historyPath); Directory.Delete(testDir);
 }
-var backup = new SettingsBundle(new TypingSettings { Pace=1.6, TranslateHotkey=new(0x4003,0x54,"Ctrl+Alt+T") },
+Require(!new TypingSettings().RunOnStartup,"Startup is off by default");
+string? startupCommand = null;
+StartupRegistration.Apply(true,@"C:\Program Files\Auto Typer\AutoTyper.exe",value=>startupCommand=value);
+Require(startupCommand=="\"C:\\Program Files\\Auto Typer\\AutoTyper.exe\" --startup","Startup command quotes paths and marks login launch");
+StartupRegistration.Apply(false,write:value=>startupCommand=value);
+Require(startupCommand is null,"Disabling startup removes only the app's startup value");
+await Fail(()=>Task.Run(()=>StartupRegistration.BuildCommand("relative.exe")));
+await Fail(()=>Task.Run(()=>StartupRegistration.BuildCommand("C:\\bad\"path.exe")));
+var backup = new SettingsBundle(new TypingSettings { Pace=1.6, RunOnStartup=true, TranslateHotkey=new(0x4003,0x54,"Ctrl+Alt+T") },
     settings, new TranslationSettings { ApiKey="test-translator-key-123456", Region="eastus", TargetLanguage="Japanese" });
 const string backupPassword = "test backup password";
 byte[] backupData = SettingsBackup.Export(backup, backupPassword);

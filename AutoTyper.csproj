@@ -4,8 +4,8 @@
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <RootNamespace>AutoTyper</RootNamespace>
-    <Version>0.2.1</Version>
-    <InformationalVersion>0.2.1</InformationalVersion>
+    <Version>0.2.2</Version>
+    <InformationalVersion>0.2.2</InformationalVersion>
     <Product>Auto Typer</Product>
     <Description>Automatic typing with natural rhythm and global keyboard output.</Description>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -17,6 +17,8 @@
     <WindowsPackageType>None</WindowsPackageType>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <OcrRuntimeArchitecture Condition="'$(RuntimeIdentifier)' == 'win-arm64' Or '$(Platform)' == 'ARM64'">arm64</OcrRuntimeArchitecture>
+    <OcrRuntimeArchitecture Condition="'$(OcrRuntimeArchitecture)' == ''">x64</OcrRuntimeArchitecture>
     <DefaultItemExcludes>$(DefaultItemExcludes);dist\**;.tools\**;native\**;tests\**;cloudflare\**</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup>
@@ -27,7 +29,7 @@
     <Content Include="$(NuGetPackageRoot)rapidocrnet\4.2.0\models\v5\ch_*.onnx"
              Link="Assets\OCR\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\OCR\**" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <Content Include="Assets\OcrRuntime\x64\*.dll" Link="x64\%(Filename)%(Extension)"
+    <Content Include="Assets\OcrRuntime\$(OcrRuntimeArchitecture)\*.dll" Link="$(OcrRuntimeArchitecture)\%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\OcrRuntime\*.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\OcrRuntime\*.rtf" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
