@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag (for example v0.1)
+        description: Existing release tag (for example v0.2)
         required: true
-        default: v0.1
+        default: v0.2
       edition:
         description: Edition to build and publish
         type: choice
@@ -27,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || env.RELEASE_TAG }}
+          ref: ${{ env.RELEASE_TAG }}
       - uses: actions/setup-dotnet@v5
         if: env.BUILD_EDITION != 'compact'
         with:
@@ -36,6 +36,14 @@ jobs:
         if: env.BUILD_EDITION != 'compact'
         shell: pwsh
         run: dotnet publish AutoTyper.csproj -p:PublishProfile=SingleFile-x64 -c Release -p:Platform=x64
+      - name: Check main-edition features
+        if: env.BUILD_EDITION != 'compact'
+        shell: pwsh
+        run: |
+          foreach ($project in @('QrDecoder.Tests', 'Screenshot.Tests', 'Ocr.Tests', 'Sharing.Tests', 'SingleInstance.Tests')) {
+            dotnet run --project "tests/$project" -c Release
+            if ($LASTEXITCODE -ne 0) { throw "$project failed." }
+          }
       - name: Build and test compact edition
         if: env.BUILD_EDITION != 'winui'
         shell: pwsh
@@ -68,7 +76,7 @@ jobs:
           Add-Content -LiteralPath $notesPath -Value "`nBuild source: https://github.com/${{ github.repository }}/tree/${{ github.sha }}"
           gh release view $env:RELEASE_TAG *> $null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $env:RELEASE_TAG --verify-tag --title "Auto Typer $env:RELEASE_TAG" --notes-file $notesPath
+            gh release create $env:RELEASE_TAG --verify-tag --draft --title "Auto Typer $env:RELEASE_TAG" --notes-file $notesPath
             if ($LASTEXITCODE -ne 0) { throw 'Could not create release.' }
           } else {
             gh release edit $env:RELEASE_TAG --title "Auto Typer $env:RELEASE_TAG" --notes-file $notesPath
@@ -79,3 +87,5 @@ jobs:
           if ($env:BUILD_EDITION -ne 'winui') { $assets += 'native/dist/AutoTyperCompact.exe', 'native/dist/AutoTyperCompact.exe.sha256' }
           gh release upload $env:RELEASE_TAG @assets --clobber
           if ($LASTEXITCODE -ne 0) { throw 'Could not upload release assets.' }
+          gh release edit $env:RELEASE_TAG --draft=false --latest
+          if ($LASTEXITCODE -ne 0) { throw 'Could not publish the completed release.' }

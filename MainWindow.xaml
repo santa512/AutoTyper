@@ -6,6 +6,7 @@
     <Grid>
     <Border x:Name="AppSurface" Padding="32" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
         <Grid>
+        <Grid x:Name="MainContent">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
@@ -22,13 +23,17 @@
                 <TextBlock Text="Auto Typer" FontSize="30" FontWeight="SemiBold" />
                 <Border Padding="8,3" CornerRadius="5" VerticalAlignment="Center"
                         Background="{ThemeResource SubtleFillColorSecondaryBrush}">
-                    <TextBlock Text="v0.1" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Text="v0.2" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </Border>
             </StackPanel>
             <TextBlock
                 Text="Type into your focused app with a natural pace and rhythm."
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
         </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+            <Button x:Name="SharingSettingsButton" Click="SharingSettings_Click" Width="36" Height="36" MinWidth="36" Padding="0" AutomationProperties.Name="Settings" ToolTipService.ToolTip="Settings">
+                <FontIcon Glyph="&#xE713;" FontSize="17" />
+            </Button>
             <ToggleButton
                 x:Name="PinButton"
                 Grid.Column="1"
@@ -41,6 +46,7 @@
                     <TextBlock x:Name="PinButtonText" Text="Pin on top" />
                 </StackPanel>
             </ToggleButton>
+            </StackPanel>
         </Grid>
 
         <Grid Grid.Row="1" ColumnSpacing="20">
@@ -70,13 +76,16 @@
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
                         <Button x:Name="ClipboardButton" Grid.Column="1" VerticalAlignment="Center"
-                                Content="Paste from clipboard" Click="ClipboardButton_Click"
-                                ToolTipService.ToolTip="Replace the input with plain text from your clipboard" />
+                                Width="36" Height="36" MinWidth="36" Padding="0"
+                                Click="ClipboardButton_Click" AutomationProperties.Name="Paste from clipboard"
+                                ToolTipService.ToolTip="Paste from clipboard">
+                            <FontIcon Glyph="&#xE77F;" FontSize="16" />
+                        </Button>
                     </Grid>
                     <TextBox
                         x:Name="SourceBox"
                         Grid.Row="1"
-                        MinHeight="260"
+                        MinHeight="100"
                         SelectionHighlightColorWhenNotFocused="#FFB8860B"
                         SelectionHighlightColor="#FFB8860B"
                         AcceptsReturn="True"
@@ -84,7 +93,146 @@
                         ScrollViewer.VerticalScrollBarVisibility="Auto"
                         TextChanged="SourceBox_TextChanged"
                         Text="The best way to improve your typing is to practice at a comfortable pace." />
-                    <Grid Grid.Row="3" ColumnSpacing="24">
+                    <Border x:Name="HistoryPanel" Grid.Row="2" Visibility="Collapsed" Padding="12" CornerRadius="8"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                        <StackPanel Spacing="8">
+                            <Grid>
+                                <TextBlock Text="Shared URLs" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <Button HorizontalAlignment="Right" Click="HistoryClose_Click" Width="28" Height="28" MinWidth="28" Padding="0" AutomationProperties.Name="Close URL history" ToolTipService.ToolTip="Close history"><FontIcon Glyph="&#xE711;" FontSize="12" /></Button>
+                            </Grid>
+                            <TextBlock Text="Shared screenshots are saved for 14 days." TextWrapping="Wrap" FontSize="12" />
+                            <TextBlock x:Name="HistoryEmptyText" Text="Your shared screenshots will appear here." TextWrapping="Wrap" />
+                                    <Grid ColumnSpacing="12" Margin="12,0,12,0">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="110" /><ColumnDefinition Width="*" /><ColumnDefinition Width="72" /></Grid.ColumnDefinitions>
+                                        <TextBlock Text="Timeline" FontSize="12" FontWeight="SemiBold" />
+                                        <TextBlock Grid.Column="1" Text="Shared URL" FontSize="12" FontWeight="SemiBold" />
+                                        <TextBlock Grid.Column="2" Text="Actions" FontSize="12" FontWeight="SemiBold" />
+                                    </Grid>
+                                    <ListView x:Name="ShareHistoryList" Margin="4,4,4,4" MaxHeight="130" SelectionMode="None" IsItemClickEnabled="False"
+                                              HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" ScrollViewer.HorizontalScrollMode="Disabled">
+                                        <ListView.ItemContainerStyle>
+                                            <Style TargetType="ListViewItem">
+                                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                <Setter Property="Padding" Value="8,4" />
+                                                <Setter Property="MinWidth" Value="0" />
+                                            </Style>
+                                        </ListView.ItemContainerStyle>
+                                        <ListView.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid ColumnSpacing="12" Margin="0,8,0,8">
+                                                    <Grid.ColumnDefinitions><ColumnDefinition Width="110" /><ColumnDefinition Width="*" /><ColumnDefinition Width="72" /></Grid.ColumnDefinitions>
+                                                    <TextBlock Text="{Binding TimelineLabel}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" />
+                                                    <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Url}" TextTrimming="CharacterEllipsis" ToolTipService.ToolTip="{Binding Url}" />
+                                                        <TextBlock Text="{Binding ExpiryLabel}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                    </StackPanel>
+                                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                        <Button Tag="{Binding Url}" Click="HistoryCopy_Click" Width="32" Height="32" MinWidth="32" Padding="0" ToolTipService.ToolTip="Copy URL" AutomationProperties.Name="Copy shared URL"><FontIcon Glyph="&#xE8C8;" FontSize="15" /></Button>
+                                                        <Button Tag="{Binding Url}" Click="HistoryOpen_Click" Width="32" Height="32" MinWidth="32" Padding="0" ToolTipService.ToolTip="Open in browser" AutomationProperties.Name="Open shared URL"><FontIcon Glyph="&#xE8A7;" FontSize="15" /></Button>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListView.ItemTemplate>
+                                    </ListView>
+                        </StackPanel>
+                    </Border>
+                    <StackPanel Grid.Row="3" Spacing="8">
+                        <Grid>
+                            <TextBlock x:Name="StatusText" Text="Ready" FontSize="12" AutomationProperties.LiveSetting="Polite" />
+                            <TextBlock x:Name="ProgressText" HorizontalAlignment="Right" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <ToolTipService.ToolTip><TextBlock x:Name="ActivityText" TextWrapping="Wrap" MaxWidth="350" /></ToolTipService.ToolTip>
+                        </Grid>
+                        <ProgressBar x:Name="TypingProgressBar" Height="3" MinHeight="3" Minimum="0" Maximum="100" Value="0" IsIndeterminate="False" AutomationProperties.Name="Typing progress" />
+                    </StackPanel>
+
+                </Grid>
+            </Border>
+
+        </Grid>
+
+        <Grid Grid.Row="2" Margin="0,20,0,0" ColumnSpacing="24">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="6" VerticalAlignment="Bottom">
+                <TextBlock x:Name="RegionSelectionText" Text="Select a screen region" FontSize="12"
+                           ToolTipService.ToolTip="{Binding Text, ElementName=RegionSelectionText}"
+                           TextTrimming="CharacterEllipsis" AutomationProperties.LiveSetting="Polite"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <StackPanel x:Name="RegionTools" Orientation="Horizontal" Spacing="8">
+                    <Button x:Name="QrToolButton" Tag="QR" Click="RegionButton_Click" Width="36" Height="36" MinWidth="36" Padding="0"
+                            AutomationProperties.Name="Scan QR code" ToolTipService.ToolTip="Scan QR code">
+                        <Viewbox Width="18" Height="18">
+                            <Canvas Width="24" Height="24">
+                                <Path Stroke="{ThemeResource TextFillColorPrimaryBrush}" StrokeThickness="2"
+                                      Data="M1,1 H9 V9 H1 Z M15,1 H23 V9 H15 Z M1,15 H9 V23 H1 Z M15,15 H19 V19 H23 V23 H15 Z" />
+                                <Path Fill="{ThemeResource TextFillColorPrimaryBrush}"
+                                      Data="M4,4 H6 V6 H4 Z M18,4 H20 V6 H18 Z M4,18 H6 V20 H4 Z M21,12 H24 V15 H21 Z M12,10 H15 V13 H12 Z" />
+                            </Canvas>
+                        </Viewbox>
+                    </Button>
+                    <Button x:Name="TextExtractToolButton" Tag="Text Extract" Click="RegionButton_Click" Width="36" Height="36" MinWidth="36" Padding="0"
+                            AutomationProperties.Name="Text Extract" ToolTipService.ToolTip="Extract English text from a screen region">
+                        <FontIcon Glyph="&#xE8E9;" FontSize="17" />
+                    </Button>
+                    <Button x:Name="ScreenshotToolButton" Tag="Screenshot" Click="RegionButton_Click" Width="36" Height="36" MinWidth="36" Padding="0"
+                            AutomationProperties.Name="Screenshot" ToolTipService.ToolTip="Screenshot — save as PNG, or copy image when clipboard toggle is on">
+                        <FontIcon Glyph="&#xE722;" FontSize="17" />
+                    </Button>
+                    <Button x:Name="ShareToolButton" Tag="Share" Click="RegionButton_Click" Width="36" Height="36" MinWidth="36" Padding="0"
+                            AutomationProperties.Name="Share screenshot"
+                            ToolTipService.ToolTip="Share screenshot — upload to R2 and copy the public link. Shared screenshots are saved for 14 days. Right-click for settings.">
+                        <Button.ContextFlyout>
+                            <MenuFlyout>
+                                <MenuFlyoutItem Text="Sharing settings" Click="SharingSettings_Click" />
+                            </MenuFlyout>
+                        </Button.ContextFlyout>
+                        <FontIcon Glyph="&#xE72D;" FontSize="17" />
+                    </Button>
+                    <Button x:Name="ShareHistoryButton" Width="36" Height="36" MinWidth="36" Padding="0" AutomationProperties.Name="Shared URL history" ToolTipService.ToolTip="Shared URL history · 14-day retention" Click="ShareHistory_Click">
+                        <FontIcon Glyph="&#xE81C;" FontSize="17" />
+
+                    </Button>
+                    <ToggleSwitch x:Name="CopyResultToggle" IsOn="False" MinWidth="0" FontSize="12"
+                                  VerticalAlignment="Center" Margin="8,0,0,0"
+                                  OnContent="Copy result to clipboard" OffContent="Copy result to clipboard"
+                                  AutomationProperties.Name="Copy result to clipboard"
+                                  ToolTipService.ToolTip="QR and Text Extract: also copy recognized text. Screenshot: copy image instead of Save As. Share: copies the public link." />
+                </StackPanel>
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Bottom">
+                <Button Content="Reset progress" Click="ResetButton_Click" />
+                <Button
+                    x:Name="StopButton"
+                    Content="Stop"
+                    MinWidth="88"
+                    IsEnabled="False"
+                    Click="StopButton_Click" />
+                <Button
+                    x:Name="StartPauseButton"
+                    Content="Start"
+                    MinWidth="100"
+                    Click="StartPauseButton_Click"
+                    Style="{StaticResource AccentButtonStyle}" />
+            </StackPanel>
+        </Grid>
+        </Grid>
+        <Grid x:Name="SharingPanel" Visibility="Collapsed" RowSpacing="20" ColumnSpacing="24">
+            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+            <Grid.ColumnDefinitions><ColumnDefinition Width="168" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+            <TextBlock Grid.ColumnSpan="2" Text="Settings" FontSize="26" FontWeight="SemiBold" />
+            <StackPanel Grid.Row="1" Spacing="8">
+                <ToggleButton x:Name="TypingSettingsTab" Content="Auto Typer" Tag="Typing" IsChecked="True" Click="SettingsSection_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
+                <ToggleButton x:Name="CloudSettingsTab" Content="Cloudflare bucket" Tag="Cloud" Click="SettingsSection_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
+                <ToggleButton x:Name="HotkeysSettingsTab" Content="Hotkeys" Tag="Hotkeys" Click="SettingsSection_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
+            </StackPanel>
+            <ScrollViewer x:Name="SettingsScroller" Grid.Row="1" Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" ViewChanged="SettingsScroller_ViewChanged">
+                <StackPanel x:Name="SettingsSections" Spacing="24" Padding="0,0,16,16">
+                    <StackPanel x:Name="TypingSettingsSection" Spacing="16">
+                        <TextBlock Text="Auto Typer" FontSize="20" FontWeight="SemiBold" />
+                        <TextBlock Text="Choose your typing pace, rhythm and delay. Configure shortcuts in Hotkeys." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <Grid  ColumnSpacing="24">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="*" />
@@ -130,92 +278,83 @@
                             ValueChanged="MistakeSlider_ValueChanged" />
                         </StackPanel>
                     </Grid>
-                    <Grid Grid.Row="2" ColumnSpacing="8" VerticalAlignment="Center">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="100" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="160" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Delay (s)" VerticalAlignment="Center" FontSize="12" />
-                        <NumberBox
-                            x:Name="ReadyDelayBox"
-                            AutomationProperties.Name="Ready delay in seconds"
-                            Grid.Column="1"
-                            Minimum="0"
-                            Maximum="10"
-                            Value="2.5"
-                            SmallChange="0.5"
-                            SpinButtonPlacementMode="Inline"
-                            ValueChanged="ReadyDelayBox_ValueChanged" />
-                        <TextBlock
-                            Grid.Column="2"
-                            Text="Hotkey"
-                            FontSize="12"
-                            VerticalAlignment="Center" />
-                        <TextBox
-                            x:Name="HotkeyInput"
-                            Grid.Column="3"
-                            IsReadOnly="True"
-                            Text="Ctrl+Shift+Space"
-                            KeyDown="HotkeyInput_KeyDown" />
-                        <Button
-                            x:Name="RecordHotkeyButton"
-                            Grid.Column="4"
-                            Width="32" Height="32" MinWidth="32" Padding="0"
-                            AutomationProperties.Name="Change hotkey"
-                            Click="RecordHotkeyButton_Click">
-                            <ToolTipService.ToolTip>
-                                <TextBlock x:Name="HotkeyStatusText" Text="Change hotkey" TextWrapping="Wrap" MaxWidth="300" />
-                            </ToolTipService.ToolTip>
-                            <FontIcon Glyph="&#xE70F;" FontSize="14" />
-                        </Button>
-                        <Border Grid.Column="5" HorizontalAlignment="Right" Padding="8,4" CornerRadius="6"
-                                VerticalAlignment="Center" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
-                            <ToolTipService.ToolTip>
-                                <StackPanel MaxWidth="350" Spacing="4">
-                                    <TextBlock Text="{Binding Text, ElementName=StatusText}" TextWrapping="Wrap" />
-                                    <TextBlock x:Name="ActivityText" TextWrapping="Wrap" />
-                                </StackPanel>
-                            </ToolTipService.ToolTip>
-                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                <ProgressRing x:Name="TypingProgressRing" Width="18" Height="18" MinWidth="18" MinHeight="18"
-                                              IsIndeterminate="False" Minimum="0" Maximum="100" Value="0"
-                                              AutomationProperties.Name="Typing progress" />
-                                <TextBlock x:Name="StatusText" Text="Ready" MaxWidth="95" FontSize="12"
-                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
-                                           AutomationProperties.LiveSetting="Polite" />
-                                <TextBlock x:Name="ProgressText" FontSize="12" VerticalAlignment="Center"
-                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            </StackPanel>
-                        </Border>
-                    </Grid>
-                </Grid>
-            </Border>
 
-        </Grid>
+                    <NumberBox x:Name="ReadyDelayBox" Header="Delay (seconds)" AutomationProperties.Name="Ready delay in seconds" Width="160" HorizontalAlignment="Left" Minimum="0" Maximum="10" Value="3" SmallChange="0.5" SpinButtonPlacementMode="Inline" ValueChanged="ReadyDelayBox_ValueChanged" />
+                    <ToggleSwitch x:Name="MinimizeToTrayToggle" Header="Minimize to tray" OnContent="Enabled" OffContent="Disabled" />
+                    <TextBlock Text="Keep Auto Typer and its global hotkeys running when minimized or closed. Use Exit in the tray menu to quit."
+                               FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 
-        <Grid Grid.Row="2" Margin="0,20,0,0" ColumnSpacing="24">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Bottom">
-                <Button Content="Reset progress" Click="ResetButton_Click" />
-                <Button
-                    x:Name="StopButton"
-                    Content="Stop"
-                    MinWidth="88"
-                    IsEnabled="False"
-                    Click="StopButton_Click" />
-                <Button
-                    x:Name="StartPauseButton"
-                    Content="Start"
-                    MinWidth="100"
-                    Click="StartPauseButton_Click"
-                    Style="{StaticResource AccentButtonStyle}" />
+                    </StackPanel>
+                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                    <StackPanel x:Name="CloudSettingsSection" Spacing="12" Padding="0,0,0,12">
+                        <TextBlock Text="Cloudflare bucket" FontSize="20" FontWeight="SemiBold" />
+                        <TextBlock Text="Shared screenshots are saved for 14 days. Anyone with the link can view the image." TextWrapping="Wrap" />
+                        <HyperlinkButton Content="Create R2 keys — Object Read &amp; Write for this bucket" NavigateUri="https://developers.cloudflare.com/r2/api/tokens/" Padding="0" />
+                        <TextBox x:Name="SharingAccount" Header="Cloudflare account ID" PlaceholderText="32-character account ID" />
+                        <TextBox x:Name="SharingBucket" Header="Bucket name" PlaceholderText="my-screenshots" />
+                        <ComboBox x:Name="SharingJurisdiction" Header="Bucket jurisdiction" HorizontalAlignment="Stretch" SelectedIndex="0">
+                            <ComboBoxItem Content="Default" Tag="default" />
+                            <ComboBoxItem Content="European Union" Tag="eu" />
+                            <ComboBoxItem Content="United States" Tag="us" />
+                            <ComboBoxItem Content="FedRAMP" Tag="fedramp" />
+                        </ComboBox>
+                        <PasswordBox x:Name="SharingAccessKey" Header="Access Key ID" />
+                        <PasswordBox x:Name="SharingSecretKey" Header="Secret Access Key" />
+                        <TextBox x:Name="SharingPublicUrl" Header="Public bucket URL" />
+                        <TextBlock Text="Keys are encrypted for your Windows account and stored only on this PC. Keep the 14-day R2 lifecycle rule enabled for share/ uploads." TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                    <StackPanel x:Name="HotkeysSettingsSection" Spacing="16" MinHeight="{Binding ActualHeight, ElementName=SettingsScroller}">
+                        <TextBlock Text="Hotkeys" FontSize="20" FontWeight="SemiBold" />
+                        <TextBlock Text="Global shortcuts work from other apps. Select the pencil, then press a combination. Changes apply when you save." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="220" /><ColumnDefinition Width="36" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Auto type start / pause" VerticalAlignment="Center" />
+                            <TextBox x:Name="HotkeyInput" Grid.Column="1" IsReadOnly="True" KeyDown="HotkeyInput_KeyDown" AutomationProperties.Name="Auto type start / pause hotkey" />
+                            <Button x:Name="RecordHotkeyButton" Grid.Column="2" Tag="Typing" Click="RecordHotkeyButton_Click" Width="36" Height="36" MinWidth="36" Padding="0" AutomationProperties.Name="Change Auto type start / pause hotkey" ToolTipService.ToolTip="Record hotkey"><FontIcon Glyph="&#xE70F;" FontSize="15" /></Button>
+                        </Grid>
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="220" /><ColumnDefinition Width="36" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Screenshot" VerticalAlignment="Center" />
+                            <TextBox x:Name="ScreenshotHotkeyInput" Grid.Column="1" IsReadOnly="True" KeyDown="HotkeyInput_KeyDown" AutomationProperties.Name="Screenshot hotkey" />
+                            <Button x:Name="ScreenshotHotkeyButton" Grid.Column="2" Tag="Screenshot" Click="RecordHotkeyButton_Click" Width="36" Height="36" MinWidth="36" Padding="0" AutomationProperties.Name="Change Screenshot hotkey" ToolTipService.ToolTip="Record hotkey"><FontIcon Glyph="&#xE70F;" FontSize="15" /></Button>
+                        </Grid>
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="220" /><ColumnDefinition Width="36" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Instant share" VerticalAlignment="Center" />
+                            <TextBox x:Name="ShareHotkeyInput" Grid.Column="1" IsReadOnly="True" KeyDown="HotkeyInput_KeyDown" AutomationProperties.Name="Instant share hotkey" />
+                            <Button x:Name="ShareHotkeyButton" Grid.Column="2" Tag="Share" Click="RecordHotkeyButton_Click" Width="36" Height="36" MinWidth="36" Padding="0" AutomationProperties.Name="Change Instant share hotkey" ToolTipService.ToolTip="Record hotkey"><FontIcon Glyph="&#xE70F;" FontSize="15" /></Button>
+                        </Grid>
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="220" /><ColumnDefinition Width="36" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="QR code" VerticalAlignment="Center" />
+                            <TextBox x:Name="QrHotkeyInput" Grid.Column="1" IsReadOnly="True" KeyDown="HotkeyInput_KeyDown" AutomationProperties.Name="QR code hotkey" />
+                            <Button x:Name="QrHotkeyButton" Grid.Column="2" Tag="QR" Click="RecordHotkeyButton_Click" Width="36" Height="36" MinWidth="36" Padding="0" AutomationProperties.Name="Change QR code hotkey" ToolTipService.ToolTip="Record hotkey"><FontIcon Glyph="&#xE70F;" FontSize="15" /></Button>
+                        </Grid>
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="220" /><ColumnDefinition Width="36" /></Grid.ColumnDefinitions>
+                            <TextBlock Text="Text extract" VerticalAlignment="Center" />
+                            <TextBox x:Name="TextExtractHotkeyInput" Grid.Column="1" IsReadOnly="True" KeyDown="HotkeyInput_KeyDown" AutomationProperties.Name="Text extract hotkey" />
+                            <Button x:Name="TextExtractHotkeyButton" Grid.Column="2" Tag="Text Extract" Click="RecordHotkeyButton_Click" Width="36" Height="36" MinWidth="36" Padding="0" AutomationProperties.Name="Change Text extract hotkey" ToolTipService.ToolTip="Record hotkey"><FontIcon Glyph="&#xE70F;" FontSize="15" /></Button>
+                        </Grid>
+                        <TextBlock x:Name="HotkeyStatusText" TextWrapping="Wrap" FontSize="12" AutomationProperties.LiveSetting="Polite" />
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+            <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Spacing="8">
+                <TextBlock x:Name="SharingError" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+                <Border x:Name="UnsavedChangesPrompt" Visibility="Collapsed" HorizontalAlignment="Right" Padding="10,6" CornerRadius="6"
+                        Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="Save changes before leaving?" FontSize="12" VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite" />
+                        <Button Content="Yes" Click="SaveChangesYes_Click" MinWidth="40" Padding="8,4" FontSize="12" />
+                        <Button Content="No" Click="DiscardChangesNo_Click" MinWidth="40" Padding="8,4" FontSize="12" />
+                    </StackPanel>
+                </Border>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                    <Button Content="Back" Click="SharingBack_Click" />
+                    <Button Content="Save" Click="SharingSave_Click" Style="{StaticResource AccentButtonStyle}" />
+                </StackPanel>
             </StackPanel>
         </Grid>
         </Grid>

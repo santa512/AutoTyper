@@ -10,6 +10,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Windows.System;
 using Windows.ApplicationModel.DataTransfer;
+using Windows.Storage.Streams;
+using System.IO;
+using System.Net.Http;
 
 namespace AutoTyper;
 
@@ -47,27 +50,641 @@ public sealed partial class MainWindow : Window
     private string _source = string.Empty;
     private int _sourceIndex;
     private int _caret;
-    private uint _hotkeyModifiers = ModControl | ModShift | ModNoRepeat;
-    private uint _hotkeyVirtualKey = 0x20;
-    private string _hotkeyLabel = "Ctrl+Shift+Space";
     private bool _isRunning;
     private bool _isPaused;
     private bool _isCountingDown;
     private bool _isRecordingHotkey;
     private bool _windowSubclassed;
-    private bool _hotkeyRegistered;
+    private GlobalHotkeySet? _globalHotkeys;
+    private Dictionary<string, HotkeyGesture> _activeHotkeys = new TypingSettings().GetHotkeys();
+    private Dictionary<string, HotkeyGesture> _draftHotkeys = new TypingSettings().GetHotkeys();
+    private TextBox? _recordingInput;
+    private string _recordingAction = "Typing";
     private int _typedLength;
     private bool _hasProgress;
     private int[] _sourceTextOffsets = Array.Empty<int>();
     private IntPtr _targetWindow;
     private bool _isReadingClipboard;
     private bool _isClosing;
+    private bool _isSelectingRegion;
+    private ScreenRegionSelector? _regionSelector;
+    private InMemoryRandomAccessStream? _screenshotClipboardStream;
+    private CancellationTokenSource? _ocrCancellation;
+    private CancellationTokenSource? _shareCancellation;
+    private SharingSettings? _sharingSettings;
+    private TaskCompletionSource<SharingSettings?>? _sharingCompletion;
+    private TypingSettings? _typingBeforeSettings;
+    private string[] _cloudBeforeSettings = [];
+    private bool _settingsSaved;
+    private bool _sharingRequired;
+    private TrayIcon? _trayIcon;
+    private bool _minimizeToTray;
+    private bool _isInTray;
+    private bool _exitRequested;
+    private static readonly HttpClient ShareHttpClient = ScreenshotShareClient.CreateHttpClient();
+    internal ScreenRegion? SelectedRegion { get; private set; }
+
+    private void SetRegionToolsEnabled(bool enabled)
+    {
+        foreach (UIElement child in RegionTools.Children)
+            if (child is Button button) button.IsEnabled = enabled;
+        ShareToolButton.IsEnabled = enabled && _sharingSettings is not null;
+        RefreshActionTooltips();
+        CopyResultToggle.IsEnabled = enabled;
+        SharingSettingsButton.IsEnabled = enabled;
+    }
+
+    private async void RegionButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isRunning || _isReadingClipboard || _isSelectingRegion || _isClosing) return;
+        string tool = (sender as Button)?.Tag as string ?? "Screenshot";
+        if (tool == "Share" && _sharingSettings is null)
+        {
+            RegionSelectionText.Text = "Configure your Cloudflare bucket in Settings to enable sharing.";
+            return;
+        }
+        bool copyResult = CopyResultToggle.IsOn;
+        bool returnToTray = _isInTray;
+        _isSelectingRegion = true;
+        SetRegionToolsEnabled(false);
+        ClipboardButton.IsEnabled = StartPauseButton.IsEnabled = RecordHotkeyButton.IsEnabled = false;
+        EndHotkeyRecording();
+        try
+        {
+            if (tool == "Share")
+            {
+                _sharingSettings ??= SharingSettingsStore.Load();
+                _sharingSettings ??= await ConfigureSharingAsync(requireSharing: true);
+                if (_sharingSettings is null || _isClosing) return;
+            }
+            using var selector = new ScreenRegionSelector(tool);
+            _regionSelector = selector;
+            ShowWindow(_windowHandle, 0);
+            ScreenRegion? region = await selector.SelectAsync();
+            if (_isClosing) return;
+            SelectedRegion = region;
+            if (region is { } shareRegion && tool == "Share")
+            {
+                _shareCancellation = new CancellationTokenSource();
+                CancellationToken shareToken = _shareCancellation.Token;
+                CapturedScreen capture = await Task.Run(() => ScreenCapture.Capture(shareRegion));
+                if (_isClosing) return;
+                byte[] png = await ScreenshotPng.EncodeAsync(capture);
+                if (_isClosing) return;
+                ShowWindow(_windowHandle, 5);
+                Activate();
+                StopButton.IsEnabled = true;
+                StatusText.Text = "Uploading";
+                RegionSelectionText.Text = "Uploading screenshot to your public R2 bucket…";
+                Uri link = await new ScreenshotShareClient(ShareHttpClient).UploadAsync(png, _sharingSettings!, shareToken);
+                if (_isClosing) return;
+                bool historySaved = true;
+                try { ShareHistoryStore.Add(link, DateTimeOffset.UtcNow); }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+                { historySaved = false; }
+                SourceBox.Text = link.AbsoluteUri;
+                SourceBox.Select(0, 0);
+                ActivityText.Text = string.Empty;
+                RegionSelectionText.Text = $"Saved for 14 days · {link.AbsoluteUri}";
+                if (!historySaved) RegionSelectionText.Text += " · Could not save history";
+                StatusText.Text = "Shared";
+                bool copied = false;
+                try
+                {
+                    var content = new DataPackage();
+                    content.SetText(link.AbsoluteUri);
+                    Clipboard.SetContent(content);
+                    Clipboard.Flush();
+                    StatusText.Text = "Link copied";
+                    copied = true;
+                }
+                catch (Exception exception) when (exception is COMException or InvalidOperationException or UnauthorizedAccessException)
+                {
+                    RegionSelectionText.Text = $"Shared (could not copy): {link.AbsoluteUri}";
+                    Debug.WriteLine(exception);
+                }
+                await App.ScreenshotNotifications.ShowAsync("Screenshot shared",
+                    copied ? "Public link copied · Saved for 14 days" : $"{link.AbsoluteUri} · Saved for 14 days", capture);
+                return;
+            }
+            if (region is { } textRegion && tool == "Text Extract")
+            {
+                _ocrCancellation = new CancellationTokenSource();
+                CancellationToken ocrToken = _ocrCancellation.Token;
+                SourceBox.IsReadOnly = true;
+                StopButton.IsEnabled = true;
+                // Capture while hidden, then restore the UI during recognition.
+                CapturedScreen capture = await Task.Run(() => ScreenCapture.Capture(textRegion));
+                if (_isClosing) return;
+                ShowWindow(_windowHandle, 5);
+                Activate();
+                RegionSelectionText.Text = "Recognizing English text…";
+                StatusText.Text = "Reading text";
+                OcrText? result = await Task.Run(() => EnglishOcr.Recognize(capture, ocrToken), ocrToken);
+                if (_isClosing) return;
+                if (result is null)
+                {
+                    StatusText.Text = "No text found";
+                    RegionSelectionText.Text = "No clear English text found. Select a tighter region with readable text.";
+                }
+                else
+                {
+                    var clipboardResult = new DataPackage();
+                    clipboardResult.SetText(result.Text);
+                    ApplyToolResult(tool, result.Text, clipboardResult, copyResult);
+                    if (result.NeedsReview || result.Confidence < 0.85f)
+                        RegionSelectionText.Text += " · Review text: recognition was uncertain";
+                }
+                return;
+            }
+            if (region is { } screenshotRegion && tool == "Screenshot")
+            {
+                CapturedScreen capture = await Task.Run(() => ScreenCapture.Capture(screenshotRegion));
+                if (_isClosing) return;
+                byte[] png = await ScreenshotPng.EncodeAsync(capture);
+                if (_isClosing) return;
+                ShowWindow(_windowHandle, 5);
+                Activate();
+                await CompleteScreenshotAsync(capture, png, copyResult);
+                return;
+            }
+            if (region is { } qrRegion && tool == "QR")
+            {
+                RegionSelectionText.Text = "Scanning QR code…";
+                string? decoded = await Task.Run(() => QrScreenScanner.Scan(qrRegion));
+                if (_isClosing) return;
+                ShowWindow(_windowHandle, 5);
+                Activate();
+                if (decoded is null)
+                    RegionSelectionText.Text = "No QR code found. Include the entire code and its border, then try again.";
+                else
+                {
+                    var clipboardResult = new DataPackage();
+                    clipboardResult.SetText(decoded);
+                    ApplyToolResult(tool, decoded, clipboardResult, copyResult);
+                }
+                return;
+            }
+            RegionSelectionText.Text = region is { } selected
+                ? $"{tool}: {selected.Width} × {selected.Height} px at ({selected.X}, {selected.Y}) · Selection only"
+                : $"{tool}: selection cancelled";
+        }
+        catch (OperationCanceledException) when (tool == "Share")
+        {
+            if (!_isClosing)
+            {
+                StatusText.Text = "Sharing stopped";
+                RegionSelectionText.Text = _shareCancellation?.IsCancellationRequested == true
+                    ? "Sharing stopped. An upload already sent may have completed."
+                    : "Upload timed out. It may have completed, but no link was received.";
+            }
+        }
+        catch (HttpRequestException) when (tool == "Share")
+        {
+            if (!_isClosing)
+            {
+                StatusText.Text = "Upload failed";
+                RegionSelectionText.Text = "Could not reach the upload service. Check your connection and Sharing settings.";
+            }
+        }
+        catch (OperationCanceledException) when (tool == "Text Extract")
+        {
+            if (!_isClosing)
+            {
+                StatusText.Text = "Cancelled";
+                RegionSelectionText.Text = "Text extraction cancelled";
+            }
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            if (!_isClosing) RegionSelectionText.Text = "Could not select or read the screen region. Try again.";
+        }
+        catch (ArgumentException exception)
+        {
+            if (!_isClosing) RegionSelectionText.Text = exception.Message;
+        }
+        catch (Exception exception) when (tool == "Text Extract" && (exception is Microsoft.ML.OnnxRuntime.OnnxRuntimeException
+            or DllNotFoundException or BadImageFormatException or TypeInitializationException))
+        {
+            if (!_isClosing)
+            {
+                StatusText.Text = "OCR unavailable";
+                RegionSelectionText.Text = "English OCR could not start. Use the latest complete Auto Typer EXE.";
+            }
+            Debug.WriteLine(exception);
+        }
+        catch (Exception exception) when (exception is COMException or InvalidOperationException)
+        {
+            if (!_isClosing && tool == "Share") StatusText.Text = "Upload failed";
+            if (!_isClosing) RegionSelectionText.Text = tool == "Share"
+                ? exception.Message : $"Could not finish {tool}. Try again.";
+            Debug.WriteLine(exception);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            if (!_isClosing && tool == "Share") StatusText.Text = "Upload failed";
+            if (!_isClosing) RegionSelectionText.Text = tool == "Share" ? "Could not upload the screenshot. Try again." : tool == "Text Extract"
+                ? "Could not read the English OCR files. Use the latest complete EXE."
+                : "Could not save the screenshot. Try another location.";
+            Debug.WriteLine(exception);
+        }
+        finally
+        {
+            _shareCancellation?.Dispose();
+            _shareCancellation = null;
+            _ocrCancellation?.Dispose();
+            _ocrCancellation = null;
+            _regionSelector = null;
+            _isSelectingRegion = false;
+            if (!_isClosing)
+            {
+                if (returnToTray && _isInTray && _minimizeToTray && _trayIcon?.IsVisible == true) HideToTray();
+                else { ShowWindow(_windowHandle, 5); Activate(); }
+                SetRegionToolsEnabled(true);
+                ClipboardButton.IsEnabled = StartPauseButton.IsEnabled = true;
+                RecordHotkeyButton.IsEnabled = _windowSubclassed;
+                if (tool is "Text Extract" or "Share")
+                {
+                    SourceBox.IsReadOnly = false;
+                    StopButton.IsEnabled = false;
+                }
+            }
+        }
+    }
+
+    private async void SharingSettings_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isRunning || _isReadingClipboard || _isSelectingRegion || _isClosing) return;
+        _isSelectingRegion = true;
+        SetRegionToolsEnabled(false);
+        StartPauseButton.IsEnabled = ClipboardButton.IsEnabled = false;
+        try { _sharingSettings = await ConfigureSharingAsync() ?? _sharingSettings; }
+        finally
+        {
+            _isSelectingRegion = false;
+            if (!_isClosing)
+            {
+                SetRegionToolsEnabled(true);
+                StartPauseButton.IsEnabled = ClipboardButton.IsEnabled = true;
+                RecordHotkeyButton.IsEnabled = _windowSubclassed;
+            }
+        }
+    }
+
+    private async Task<SharingSettings?> ConfigureSharingAsync(bool requireSharing = false)
+    {
+        _typingBeforeSettings = CaptureTypingSettings();
+        _draftHotkeys = new(_activeHotkeys);
+        _globalHotkeys?.Release();
+        UpdateHotkeyLabels();
+        HotkeyStatusText.Text = "Shortcuts pause while Settings is open. Save to apply changes.";
+        _settingsSaved = false;
+        _sharingRequired = requireSharing;
+        SharingSettings current = _sharingSettings ?? SharingSettingsStore.Load() ?? new SharingSettings();
+        SharingAccount.Text = current.AccountId;
+        SharingBucket.Text = current.BucketName;
+        SharingAccessKey.Password = current.AccessKeyId;
+        SharingSecretKey.Password = current.SecretAccessKey;
+        SharingPublicUrl.Text = current.PublicBaseUrl;
+        SharingJurisdiction.SelectedIndex = current.Jurisdiction switch { "eu" => 1, "us" => 2, "fedramp" => 3, _ => 0 };
+        _cloudBeforeSettings = CaptureCloudSettingsValues();
+        UnsavedChangesPrompt.Visibility = Visibility.Collapsed;
+        SharingError.Text = "";
+        _sharingCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        MainContent.Visibility = Visibility.Collapsed;
+        SharingPanel.Visibility = Visibility.Visible;
+        RecordHotkeyButton.IsEnabled = _windowSubclassed;
+        SettingsScroller.UpdateLayout();
+        ScrollToSettingsSection(requireSharing ? "Cloud" : "Typing");
+        if (requireSharing) SharingAccount.Focus(FocusState.Programmatic);
+        else TypingSettingsTab.Focus(FocusState.Programmatic);
+        try { return await _sharingCompletion.Task; }
+        finally
+        {
+            if (!_settingsSaved && _typingBeforeSettings is { } previous && !_isClosing)
+                ApplyTypingSettings(previous);
+            EndHotkeyRecording();
+            if (!_isClosing) RegisterActiveHotkeys();
+            SharingPanel.Visibility = Visibility.Collapsed;
+            MainContent.Visibility = Visibility.Visible;
+            SharingAccessKey.Password = SharingSecretKey.Password = "";
+            _cloudBeforeSettings = [];
+            _sharingCompletion = null;
+        }
+    }
+
+    private string[] CaptureCloudSettingsValues() =>
+    [
+        SharingAccount.Text.Trim(), SharingBucket.Text.Trim(), SharingAccessKey.Password.Trim(),
+        SharingSecretKey.Password.Trim(), SharingPublicUrl.Text.Trim(),
+        (SharingJurisdiction.SelectedItem as ComboBoxItem)?.Tag as string ?? "default"
+    ];
+
+    private void SharingBack_Click(object sender, RoutedEventArgs e)
+    {
+        bool changed = CaptureTypingSettings(useDraft: true) != _typingBeforeSettings
+            || !CaptureCloudSettingsValues().SequenceEqual(_cloudBeforeSettings);
+        if (changed) UnsavedChangesPrompt.Visibility = Visibility.Visible;
+        else _sharingCompletion?.TrySetResult(null);
+    }
+
+    private void SaveChangesYes_Click(object sender, RoutedEventArgs e) => SharingSave_Click(sender, e);
+
+    private void DiscardChangesNo_Click(object sender, RoutedEventArgs e) => _sharingCompletion?.TrySetResult(null);
+
+    private void SharingSave_Click(object sender, RoutedEventArgs e)
+    {
+        UnsavedChangesPrompt.Visibility = Visibility.Collapsed;
+        try
+        {
+            var settings = new SharingSettings
+            {
+                AccountId = SharingAccount.Text.Trim(), BucketName = SharingBucket.Text.Trim(),
+                AccessKeyId = SharingAccessKey.Password.Trim(), SecretAccessKey = SharingSecretKey.Password.Trim(),
+                Jurisdiction = (string)((ComboBoxItem)SharingJurisdiction.SelectedItem).Tag,
+                PublicBaseUrl = SharingPublicUrl.Text.Trim()
+            };
+            TypingSettings typing = CaptureTypingSettings(useDraft: true);
+            typing.Validate();
+            bool hasCloudSettings = new[] { settings.AccountId, settings.BucketName, settings.AccessKeyId, settings.SecretAccessKey }
+                .Any(value => !string.IsNullOrWhiteSpace(value));
+            if (hasCloudSettings || _sharingRequired) settings.Validate();
+            if (_windowSubclassed && _globalHotkeys?.TryApply(BuildHotkeyRegistrations(typing.GetHotkeys())) == false)
+                throw new InvalidOperationException($"Could not register {_globalHotkeys.FailedAction}. Choose another shortcut in Hotkeys; another app may be using it.");
+            if (hasCloudSettings || _sharingRequired) SharingSettingsStore.Save(settings);
+            TypingSettingsStore.Save(typing);
+            ApplyTypingSettings(typing);
+            _settingsSaved = true;
+            _sharingCompletion?.TrySetResult(hasCloudSettings ? settings : null);
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or IOException
+            or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+        {
+            _globalHotkeys?.Release();
+            SharingError.Text = exception is InvalidOperationException ? exception.Message : "Could not save sharing settings. Try again.";
+        }
+    }
+
+    internal void ActivateFromNotification()
+    {
+        if (!_isClosing && !_isSelectingRegion) ActivateExistingWindow();
+    }
+
+    private void ActivateExistingWindow()
+    {
+        if (_isClosing) return;
+        _isInTray = false;
+        _regionSelector?.Cancel();
+        ShowWindow(_windowHandle, IsIconic(_windowHandle) ? 9 : 5);
+        Activate();
+    }
+
+    private TypingSettings CaptureTypingSettings(bool useDraft = false)
+    {
+        var keys = useDraft ? _draftHotkeys : _activeHotkeys;
+        return new()
+        {
+            Pace = PaceSlider.Value, Rhythm = RhythmSlider.Value, MistakeChance = MistakeSlider.Value,
+            MinimizeToTray = MinimizeToTrayToggle.IsOn,
+            DelaySeconds = ReadyDelayBox.Value, HotkeyModifiers = keys["Typing"].Modifiers,
+            HotkeyKey = keys["Typing"].Key, HotkeyLabel = keys["Typing"].Label,
+            ScreenshotHotkey = keys["Screenshot"], ShareHotkey = keys["Share"],
+            QrHotkey = keys["QR"], TextExtractHotkey = keys["Text Extract"]
+        };
+    }
+
+    private void ApplyTypingSettings(TypingSettings settings)
+    {
+        PaceSlider.Value = settings.Pace;
+        RhythmSlider.Value = settings.Rhythm;
+        MistakeSlider.Value = settings.MistakeChance;
+        ReadyDelayBox.Value = settings.DelaySeconds;
+        MinimizeToTrayToggle.IsOn = _minimizeToTray = settings.MinimizeToTray;
+        _activeHotkeys = settings.GetHotkeys();
+        _draftHotkeys = new(_activeHotkeys);
+        UpdateHotkeyLabels();
+        UpdateTrayIcon();
+    }
+
+    private void UpdateTrayIcon()
+    {
+        if (_windowHandle == IntPtr.Zero || _isClosing) return;
+        if (!_minimizeToTray)
+        {
+            if (_isInTray) ActivateExistingWindow();
+            _trayIcon?.Dispose();
+            _trayIcon = null;
+            return;
+        }
+        if (!_windowSubclassed) return;
+        _trayIcon ??= new TrayIcon(_windowHandle, BuildTrayMenu,
+            action => DispatcherQueue.TryEnqueue(() => HandleTrayCommand(action)), () => AppSurface.ActualTheme);
+        if (!_trayIcon.Show()) RegionSelectionText.Text = "Tray icon unavailable. The window will minimize normally.";
+    }
+
+    private List<TrayCommand> BuildTrayMenu()
+    {
+        bool ready = !_isRunning && !_isReadingClipboard && !_isSelectingRegion && !_isClosing;
+        string? Shortcut(string action, int index) => _globalHotkeys?.IsRegistered(GlobalHotkeyId + index) == true
+            ? _activeHotkeys[action].Label : null;
+        return
+        [
+            new("Main", "Main", "\uE80F"),
+            new("QR", "QR code", "\uED14", Shortcut("QR", 3), ready, true),
+            new("Text Extract", "OCR / Text extract", "\uE8E9", Shortcut("Text Extract", 4), ready),
+            new("Screenshot", "Screenshot", "\uE722", Shortcut("Screenshot", 1), ready),
+            new("Share", "Instant share", "\uE72D", Shortcut("Share", 2), ready && _sharingSettings is not null),
+            new("Settings", "Settings", "\uE713", Enabled: ready, SeparatorBefore: true),
+            new("Exit", "Exit", "\uE711", SeparatorBefore: true)
+        ];
+    }
+
+    private void HandleTrayCommand(string action)
+    {
+        if (_isClosing) return;
+        if (action == "Exit") { _exitRequested = true; Close(); return; }
+        if (action == "Main") { ActivateExistingWindow(); return; }
+        if (_isRunning || _isReadingClipboard || _isSelectingRegion) return;
+        if (action == "Settings") { ActivateExistingWindow(); SharingSettings_Click(this, new RoutedEventArgs()); return; }
+        Button? tool = action switch { "QR" => QrToolButton, "Text Extract" => TextExtractToolButton,
+            "Screenshot" => ScreenshotToolButton, "Share" => ShareToolButton, _ => null };
+        if (tool is not null) RegionButton_Click(tool, new RoutedEventArgs());
+    }
+
+    private bool HideToTray()
+    {
+        if (!_minimizeToTray || _trayIcon?.IsVisible != true || _isClosing) return false;
+        _isInTray = true;
+        ShowWindow(_windowHandle, 0);
+        return true;
+    }
+
+    private void SettingsSection_Click(object sender, RoutedEventArgs e) =>
+        ScrollToSettingsSection((sender as ToggleButton)?.Tag as string ?? "Typing");
+
+    private void ScrollToSettingsSection(string section)
+    {
+        FrameworkElement target = section switch { "Cloud" => CloudSettingsSection, "Hotkeys" => HotkeysSettingsSection, _ => TypingSettingsSection };
+        double offset = target.TransformToVisual(SettingsSections).TransformPoint(new(0, 0)).Y;
+        SettingsScroller.ChangeView(null, offset, null, disableAnimation: true);
+        SetSettingsSectionSelection(section);
+    }
+
+    private void SetSettingsSectionSelection(string section)
+    {
+        TypingSettingsTab.IsChecked = section == "Typing";
+        CloudSettingsTab.IsChecked = section == "Cloud";
+        HotkeysSettingsTab.IsChecked = section == "Hotkeys";
+    }
+
+    private void SettingsScroller_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
+    {
+        if (HotkeysSettingsSection is null || SettingsSections is null || TypingSettingsTab is null || HotkeysSettingsTab is null) return;
+        double cloudOffset = CloudSettingsSection.TransformToVisual(SettingsSections).TransformPoint(new(0, 0)).Y;
+        double keysOffset = HotkeysSettingsSection.TransformToVisual(SettingsSections).TransformPoint(new(0, 0)).Y;
+        SetSettingsSectionSelection(SettingsScroller.VerticalOffset >= keysOffset - 10 ? "Hotkeys"
+            : SettingsScroller.VerticalOffset >= cloudOffset - 10 ? "Cloud" : "Typing");
+    }
+
+    private void ShareHistory_Click(object sender, RoutedEventArgs e)
+    {
+        if (HistoryPanel.Visibility == Visibility.Visible)
+        {
+            HistoryPanel.Visibility = Visibility.Collapsed;
+            return;
+        }
+        var entries = ShareHistoryStore.Load();
+        ShareHistoryList.ItemsSource = entries;
+        HistoryEmptyText.Visibility = entries.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        HistoryPanel.Visibility = Visibility.Visible;
+    }
+
+    private void HistoryClose_Click(object sender, RoutedEventArgs e) => HistoryPanel.Visibility = Visibility.Collapsed;
+
+    private async void HistoryOpen_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isRunning || _isSelectingRegion || _isClosing || (sender as Button)?.Tag is not string value
+            || !Uri.TryCreate(value, UriKind.Absolute, out Uri? url) || url.Scheme != "https"
+            || url.UserInfo.Length != 0 || url.Query.Length != 0 || url.Fragment.Length != 0) return;
+        try
+        {
+            if (!await Launcher.LaunchUriAsync(url)) RegionSelectionText.Text = "Could not open the shared URL in your browser.";
+        }
+        catch (Exception exception) when (exception is COMException or InvalidOperationException)
+        { RegionSelectionText.Text = "Could not open the shared URL in your browser."; }
+    }
+
+    private void HistoryCopy_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isRunning || _isSelectingRegion || _isClosing || (sender as Button)?.Tag is not string url) return;
+        try
+        {
+            var content = new DataPackage();
+            content.SetText(url);
+            Clipboard.SetContent(content);
+            Clipboard.Flush();
+            StatusText.Text = "Link copied";
+        }
+        catch (Exception exception) when (exception is COMException or InvalidOperationException or UnauthorizedAccessException)
+        { RegionSelectionText.Text = "Could not copy the history URL. Try again."; }
+    }
+
+    private async Task CompleteScreenshotAsync(CapturedScreen capture, byte[] png, bool copyResult)
+    {
+        string title, detail;
+        if (copyResult)
+        {
+            var stream = new InMemoryRandomAccessStream();
+            try
+            {
+                using (var writer = new DataWriter(stream))
+                {
+                    writer.WriteBytes(png);
+                    await writer.StoreAsync();
+                    writer.DetachStream();
+                }
+                if (_isClosing) { stream.Dispose(); return; }
+                stream.Seek(0);
+                var content = new DataPackage();
+                content.SetBitmap(RandomAccessStreamReference.CreateFromStream(stream));
+                if (!ApplyToolResult("Screenshot", null, content, true))
+                {
+                    stream.Dispose();
+                    return;
+                }
+                _screenshotClipboardStream?.Dispose();
+                _screenshotClipboardStream = stream;
+                // Materialize the image so it can still be pasted after Auto Typer closes.
+                try { Clipboard.Flush(); }
+                catch (Exception exception) when (exception is COMException or InvalidOperationException)
+                { Debug.WriteLine(exception); }
+            }
+            catch { stream.Dispose(); throw; }
+            title = "Screenshot copied";
+            detail = $"{capture.Width} × {capture.Height} px · Ready to paste from your clipboard";
+        }
+        else
+        {
+            var picker = new Microsoft.Windows.Storage.Pickers.FileSavePicker(AppWindow.Id)
+            {
+                SuggestedStartLocation = Microsoft.Windows.Storage.Pickers.PickerLocationId.PicturesLibrary,
+                SuggestedFileName = $"AutoTyper-Screenshot-{DateTime.Now:yyyy-MM-dd-HHmmss-fff}",
+                DefaultFileExtension = ".png"
+            };
+            picker.FileTypeChoices.Add("PNG image", new List<string> { ".png" });
+            var file = await picker.PickSaveFileAsync();
+            if (_isClosing) return;
+            if (file is null)
+            {
+                RegionSelectionText.Text = "Screenshot: save cancelled";
+                return;
+            }
+            await File.WriteAllBytesAsync(file.Path, png);
+            if (_isClosing) return;
+            title = "Screenshot saved";
+            detail = $"{capture.Width} × {capture.Height} px · {Path.GetFileName(file.Path)}";
+            RegionSelectionText.Text = $"Screenshot saved: {file.Path}";
+        }
+        StatusText.Text = copyResult ? "Image copied" : "Image saved";
+        bool notified = await App.ScreenshotNotifications.ShowAsync(title, detail, capture);
+        if (!_isClosing && !notified) RegionSelectionText.Text += " · " + App.ScreenshotNotifications.UnavailableReason;
+    }
+
+    private bool ApplyToolResult(string tool, string? text, DataPackage clipboardResult, bool copyResult)
+    {
+        if (text is not null)
+        {
+            SourceBox.Text = text;
+            SourceBox.Select(0, 0);
+            StatusText.Text = tool == "QR" ? "QR text loaded" : "Text loaded";
+            ActivityText.Text = string.Empty;
+        }
+        RegionSelectionText.Text = text is not null ? $"{tool}: text loaded into input" : $"{tool}: captured";
+        if (!copyResult) return true;
+        try
+        {
+            Clipboard.SetContent(clipboardResult);
+            RegionSelectionText.Text += " · Copied to clipboard";
+            return true;
+        }
+        catch (Exception exception) when (exception is COMException or InvalidOperationException
+            or UnauthorizedAccessException)
+        {
+            RegionSelectionText.Text += " · Could not copy to clipboard";
+            Debug.WriteLine(exception);
+            return false;
+        }
+    }
 
     public MainWindow()
     {
         _windowSubclassProc = WindowSubclassProc;
         InitializeComponent();
+        ApplyTypingSettings(TypingSettingsStore.Load());
+        _sharingSettings = SharingSettingsStore.Load();
+        SetRegionToolsEnabled(true);
         RegisterGlobalHotkey();
+        UpdateTrayIcon();
         AppSurface.Loaded += (_, _) => UpdateTitleBarTheme();
         AppSurface.ActualThemeChanged += (_, _) => DispatcherQueue.TryEnqueue(UpdateTitleBarTheme);
         UpdateTitleBarTheme();
@@ -78,9 +695,10 @@ public sealed partial class MainWindow : Window
 
     private async void ClipboardButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_isRunning || _isReadingClipboard || _isClosing) return;
+        if (_isRunning || _isReadingClipboard || _isSelectingRegion || _isClosing) return;
 
         _isReadingClipboard = true;
+        SetRegionToolsEnabled(false);
         ClipboardButton.IsEnabled = false;
         StartPauseButton.IsEnabled = false;
         try
@@ -117,13 +735,14 @@ public sealed partial class MainWindow : Window
             {
                 ClipboardButton.IsEnabled = !_isRunning;
                 StartPauseButton.IsEnabled = true;
+                SetRegionToolsEnabled(true);
             }
         }
     }
 
     private async void StartPauseButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_isReadingClipboard || _isClosing) return;
+        if (_isReadingClipboard || _isSelectingRegion || _isClosing) return;
         if (_isRunning)
         {
             if (_isPaused)
@@ -176,6 +795,8 @@ public sealed partial class MainWindow : Window
         _targetWindow = IntPtr.Zero;
         RecordHotkeyButton.IsEnabled = false;
         _isRunning = true;
+        SetRegionToolsEnabled(false);
+        RegionTools.Opacity = 0.5;
         UpdateCurrentCharacter(_sourceIndex);
         UpdateProgressText();
         _isPaused = false;
@@ -204,6 +825,8 @@ public sealed partial class MainWindow : Window
             _cancellation = null;
             _resumeSignal = null;
             _isRunning = false;
+            SetRegionToolsEnabled(true);
+            RegionTools.Opacity = 1;
             _isPaused = false;
             _isCountingDown = false;
             SourceBox.IsReadOnly = false;
@@ -230,6 +853,8 @@ public sealed partial class MainWindow : Window
 
     private void StopButton_Click(object sender, RoutedEventArgs e)
     {
+        _shareCancellation?.Cancel();
+        _ocrCancellation?.Cancel();
         _cancellation?.Cancel();
         _resumeSignal?.TrySetResult(true);
     }
@@ -370,7 +995,7 @@ public sealed partial class MainWindow : Window
         int completed = _isRunning || _hasProgress ? Math.Min(_sourceIndex, total) : 0;
         int percentage = total == 0 ? 0 : completed * 100 / total;
         ProgressText.Text = $"{completed}/{total} · {percentage}%";
-        TypingProgressRing.Value = total == 0 ? 0 : completed * 100d / total;
+        TypingProgressBar.Value = total == 0 ? 0 : completed * 100d / total;
     }
 
     private async Task CorrectMistakeAsync(
@@ -625,83 +1250,86 @@ public sealed partial class MainWindow : Window
         UpdateOptionLabels();
     }
 
+    private Dictionary<string, TextBox> HotkeyInputs => new()
+    {
+        ["Typing"] = HotkeyInput, ["Screenshot"] = ScreenshotHotkeyInput, ["Share"] = ShareHotkeyInput,
+        ["QR"] = QrHotkeyInput, ["Text Extract"] = TextExtractHotkeyInput
+    };
+
+    private void UpdateHotkeyLabels()
+    {
+        foreach (var entry in HotkeyInputs) entry.Value.Text = _draftHotkeys[entry.Key].Label;
+    }
+
+    private void EndHotkeyRecording()
+    {
+        _isRecordingHotkey = false;
+        _recordingInput = null;
+        UpdateHotkeyLabels();
+    }
+
     private void RecordHotkeyButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_hotkeyRegistered && !UnregisterHotKey(_windowHandle, GlobalHotkeyId))
-        {
-            HotkeyStatusText.Text =
-                $"Could not start recording (Windows error {Marshal.GetLastWin32Error()}).";
-            return;
-        }
-
-        _hotkeyRegistered = false;
+        EndHotkeyRecording();
+        _recordingAction = (sender as Button)?.Tag as string ?? "Typing";
+        _recordingInput = HotkeyInputs[_recordingAction];
         _isRecordingHotkey = true;
-        HotkeyInput.Text = "Press a key combination";
+        _recordingInput.Text = "Press a combination";
         HotkeyStatusText.Text = "Hold a modifier and press a key. Esc cancels.";
-        HotkeyInput.Focus(FocusState.Programmatic);
+        _recordingInput.Focus(FocusState.Programmatic);
     }
 
     private void HotkeyInput_KeyDown(object sender, KeyRoutedEventArgs e)
     {
-        if (!_isRecordingHotkey)
-        {
-            return;
-        }
-
+        if (!_isRecordingHotkey || !ReferenceEquals(sender, _recordingInput)) return;
         e.Handled = true;
         if (e.Key == VirtualKey.Escape)
         {
-            _isRecordingHotkey = false;
-            TryChangeGlobalHotkey(
-                _hotkeyModifiers,
-                _hotkeyVirtualKey,
-                _hotkeyLabel,
-                restorePreviousOnFailure: false);
+            EndHotkeyRecording();
+            HotkeyStatusText.Text = "Recording cancelled.";
             return;
         }
-
-        uint modifiers = GetPressedHotkeyModifiers();
+        uint modifiers = GetPressedHotkeyModifiers(messageState: true);
         if (IsModifierKey(e.Key))
         {
-            string pressedModifiers = FormatModifiers(modifiers);
-            HotkeyInput.Text = pressedModifiers.Length == 0
-                ? "Press a key combination"
-                : $"{pressedModifiers}+...";
-            HotkeyStatusText.Text = "Now press the key to complete the combination.";
+            _recordingInput!.Text = FormatModifiers(modifiers) + "+…";
             return;
         }
-
-        if ((modifiers & (ModControl | ModAlt | ModShift | ModWindows)) == 0)
+        if ((modifiers & 0xf) == 0)
         {
-            HotkeyStatusText.Text = "Use Ctrl, Alt, Shift, or Windows with another key.";
+            HotkeyStatusText.Text = "Use Ctrl, Alt, Shift or Windows with another key.";
             return;
         }
-
-        _isRecordingHotkey = false;
-        uint virtualKey = (uint)e.Key;
-        string label = FormatHotkey(modifiers, e.Key);
-        TryChangeGlobalHotkey(modifiers, virtualKey, label, restorePreviousOnFailure: true);
+        if (_draftHotkeys.Any(h => h.Key != _recordingAction && (h.Value.Modifiers & 0xf) == (modifiers & 0xf) && h.Value.Key == (uint)e.Key))
+        {
+            HotkeyStatusText.Text = "That shortcut is already assigned to another action. Choose a different combination.";
+            return;
+        }
+        _draftHotkeys[_recordingAction] = new(modifiers, (uint)e.Key, FormatHotkey(modifiers, e.Key));
+        EndHotkeyRecording();
+        HotkeyStatusText.Text = "Shortcut recorded. Save to apply.";
     }
 
-    private static uint GetPressedHotkeyModifiers()
+    private static uint GetPressedHotkeyModifiers(bool messageState = false)
     {
+        bool Down(int key) => messageState ? GetKeyState(key) < 0 : IsKeyDown(key);
         uint modifiers = ModNoRepeat;
-        if (IsKeyDown(VkControl))
+        if (Down(VkControl))
         {
             modifiers |= ModControl;
         }
 
-        if (IsKeyDown(VkAlt))
+        if (Down(VkAlt))
         {
             modifiers |= ModAlt;
         }
 
-        if (IsKeyDown(VkShift))
+        if (Down(VkShift))
         {
             modifiers |= ModShift;
         }
 
-        if (IsKeyDown(VkLeftWindows) || IsKeyDown(VkRightWindows))
+        if (Down(VkLeftWindows) || Down(VkRightWindows))
         {
             modifiers |= ModWindows;
         }
@@ -778,60 +1406,35 @@ public sealed partial class MainWindow : Window
         }
 
         _windowSubclassed = true;
-        TryChangeGlobalHotkey(
-            _hotkeyModifiers,
-            _hotkeyVirtualKey,
-            _hotkeyLabel,
-            restorePreviousOnFailure: false);
+        _globalHotkeys = new((id, modifiers, key) => RegisterHotKey(_windowHandle, id, modifiers, key),
+            id => UnregisterHotKey(_windowHandle, id));
+        RegisterActiveHotkeys();
     }
 
-    private bool TryChangeGlobalHotkey(
-        uint modifiers,
-        uint virtualKey,
-        string label,
-        bool restorePreviousOnFailure)
+    private static List<HotkeyRegistration> BuildHotkeyRegistrations(Dictionary<string, HotkeyGesture> hotkeys) =>
+        new[] { "Typing", "Screenshot", "Share", "QR", "Text Extract" }
+            .Select((action, index) => new HotkeyRegistration(GlobalHotkeyId + index, action, hotkeys[action])).ToList();
+
+    private void RegisterActiveHotkeys()
     {
-        uint previousModifiers = _hotkeyModifiers;
-        uint previousVirtualKey = _hotkeyVirtualKey;
-        string previousLabel = _hotkeyLabel;
-        bool hadPreviousHotkey = _hotkeyRegistered;
-        if (hadPreviousHotkey && !UnregisterHotKey(_windowHandle, GlobalHotkeyId))
-        {
-            int error = Marshal.GetLastWin32Error();
-            HotkeyStatusText.Text = $"Could not change hotkey (Windows error {error}); kept {previousLabel}.";
-            return false;
-        }
+        if (!_windowSubclassed || _globalHotkeys is null) return;
+        var failed = _globalHotkeys.RegisterAvailable(BuildHotkeyRegistrations(_activeHotkeys));
+        HotkeyStatusText.Text = failed.Count == 0 ? "All global shortcuts are active."
+            : "Unavailable: " + string.Join(", ", failed) + ". Another app may be using these shortcuts. Choose different combinations and Save.";
+        RefreshActionTooltips();
+    }
 
-        _hotkeyRegistered = false;
-        if (RegisterHotKey(_windowHandle, GlobalHotkeyId, modifiers, virtualKey))
-        {
-            _hotkeyRegistered = true;
-            _hotkeyModifiers = modifiers;
-            _hotkeyVirtualKey = virtualKey;
-            _hotkeyLabel = label;
-            HotkeyInput.Text = label;
-            HotkeyStatusText.Text = $"Global hotkey registered: {label}";
-            return true;
-        }
-
-        int registrationError = Marshal.GetLastWin32Error();
-        if ((hadPreviousHotkey || restorePreviousOnFailure)
-            && RegisterHotKey(
-                _windowHandle,
-                GlobalHotkeyId,
-                previousModifiers,
-                previousVirtualKey))
-        {
-            _hotkeyRegistered = true;
-            HotkeyInput.Text = previousLabel;
-            HotkeyStatusText.Text =
-                $"Could not register {label} (Windows error {registrationError}); kept {previousLabel}.";
-            return false;
-        }
-
-        HotkeyInput.Text = previousLabel;
-        HotkeyStatusText.Text = $"Could not register {label} (Windows error {registrationError}).";
-        return false;
+    private void RefreshActionTooltips()
+    {
+        string Shortcut(string action, int index) => _activeHotkeys[action].Label
+            + (_globalHotkeys?.IsRegistered(GlobalHotkeyId + index) == true ? "" : " · unavailable");
+        ToolTipService.SetToolTip(StartPauseButton, $"Start / pause typing ({Shortcut("Typing", 0)})");
+        ToolTipService.SetToolTip(ScreenshotToolButton, $"Screenshot ({Shortcut("Screenshot", 1)}) — save PNG, or copy image when clipboard is on.");
+        ToolTipService.SetToolTip(ShareToolButton, _sharingSettings is null
+            ? "Configure your Cloudflare bucket in Settings to enable sharing."
+            : $"Instant share ({Shortcut("Share", 2)}) — shared screenshots are saved for 14 days.");
+        ToolTipService.SetToolTip(QrToolButton, $"Scan QR code ({Shortcut("QR", 3)})");
+        ToolTipService.SetToolTip(TextExtractToolButton, $"Extract English text ({Shortcut("Text Extract", 4)})");
     }
 
     private static bool IsModifierKey(VirtualKey key)
@@ -901,10 +1504,32 @@ public sealed partial class MainWindow : Window
         UIntPtr subclassId,
         IntPtr refData)
     {
-        if (message == WmHotkey && wParam.ToInt32() == GlobalHotkeyId)
+        if (_trayIcon?.ProcessMessage(message, wParam, lParam) == true) return IntPtr.Zero;
+        if (!_exitRequested && !_isClosing && _minimizeToTray && _trayIcon?.IsVisible == true)
         {
-            StartPauseButton_Click(this, new RoutedEventArgs());
-            return IntPtr.Zero;
+            if (message == 0x0010 || (message == 0x0112 && (wParam.ToInt64() & 0xfff0) == 0xf020))
+            {
+                HideToTray();
+                return IntPtr.Zero;
+            }
+            if (message == 0x0005 && wParam.ToInt64() == 1) DispatcherQueue.TryEnqueue(() => HideToTray());
+        }
+        if (message == SingleInstance.ActivationMessage)
+        {
+            if (_isClosing) return IntPtr.Zero;
+            ActivateExistingWindow();
+            return new IntPtr(1);
+        }
+        if (message == WmHotkey)
+        {
+            int action = wParam.ToInt32() - GlobalHotkeyId;
+            if (action == 0) StartPauseButton_Click(this, new RoutedEventArgs());
+            else if (!_isRunning && !_isReadingClipboard && !_isSelectingRegion && !_isClosing)
+            {
+                Button? tool = action switch { 1 => ScreenshotToolButton, 2 => ShareToolButton, 3 => QrToolButton, 4 => TextExtractToolButton, _ => null };
+                if (tool is not null) RegionButton_Click(tool, new RoutedEventArgs());
+            }
+            if (action is >= 0 and <= 4) return IntPtr.Zero;
         }
 
         return DefSubclassProc(hWnd, message, wParam, lParam);
@@ -913,12 +1538,16 @@ public sealed partial class MainWindow : Window
     private void MainWindow_Closed(object sender, WindowEventArgs args)
     {
         _isClosing = true;
+        _trayIcon?.Dispose();
+        _trayIcon = null;
+        _sharingCompletion?.TrySetResult(null);
+        _shareCancellation?.Cancel();
+        _ocrCancellation?.Cancel();
+        _screenshotClipboardStream?.Dispose();
+        _regionSelector?.Cancel();
         _cancellation?.Cancel();
 
-        if (_hotkeyRegistered && !UnregisterHotKey(_windowHandle, GlobalHotkeyId))
-        {
-            Debug.WriteLine($"Unable to unregister global hotkey (Windows error {Marshal.GetLastWin32Error()}).");
-        }
+        _globalHotkeys?.Release();
 
         if (_windowSubclassed
             && !RemoveWindowSubclass(_windowHandle, _windowSubclassProc, HotkeySubclassId))
@@ -977,4 +1606,13 @@ public sealed partial class MainWindow : Window
 
     [DllImport("user32.dll")]
     private static extern short GetAsyncKeyState(int virtualKey);
+
+    [DllImport("user32.dll")]
+    private static extern short GetKeyState(int virtualKey);
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(IntPtr window, int command);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsIconic(IntPtr window);
 }
