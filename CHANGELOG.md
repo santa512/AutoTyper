@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add a user-activated Paste from clipboard button to both versions; pasting does not start typing and is unavailable during a run.
+
 ## 0.1 — 2026-11-18
 
 Initial release for Windows x64.

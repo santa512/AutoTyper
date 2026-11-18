@@ -9,6 +9,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Windows.System;
+using Windows.ApplicationModel.DataTransfer;
 
 namespace AutoTyper;
 
@@ -59,6 +60,8 @@ public sealed partial class MainWindow : Window
     private bool _hasProgress;
     private int[] _sourceTextOffsets = Array.Empty<int>();
     private IntPtr _targetWindow;
+    private bool _isReadingClipboard;
+    private bool _isClosing;
 
     public MainWindow()
     {
@@ -73,8 +76,54 @@ public sealed partial class MainWindow : Window
         Closed += MainWindow_Closed;
     }
 
+    private async void ClipboardButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isRunning || _isReadingClipboard || _isClosing) return;
+
+        _isReadingClipboard = true;
+        ClipboardButton.IsEnabled = false;
+        StartPauseButton.IsEnabled = false;
+        try
+        {
+            DataPackageView content = Clipboard.GetContent();
+            if (!content.Contains(StandardDataFormats.Text))
+            {
+                StatusText.Text = "The clipboard does not contain text.";
+                return;
+            }
+
+            string text = await content.GetTextAsync();
+            if (_isClosing) return;
+            if (string.IsNullOrEmpty(text))
+            {
+                StatusText.Text = "The clipboard is empty.";
+                return;
+            }
+
+            SourceBox.Text = text;
+            SourceBox.Select(0, 0);
+            ActivityText.Text = string.Empty;
+            StatusText.Text = "Clipboard text loaded";
+        }
+        catch (Exception exception) when (exception is COMException
+            or InvalidOperationException or UnauthorizedAccessException)
+        {
+            if (!_isClosing) StatusText.Text = "Could not read the clipboard. Try again.";
+        }
+        finally
+        {
+            _isReadingClipboard = false;
+            if (!_isClosing)
+            {
+                ClipboardButton.IsEnabled = !_isRunning;
+                StartPauseButton.IsEnabled = true;
+            }
+        }
+    }
+
     private async void StartPauseButton_Click(object sender, RoutedEventArgs e)
     {
+        if (_isReadingClipboard || _isClosing) return;
         if (_isRunning)
         {
             if (_isPaused)
@@ -121,6 +170,7 @@ public sealed partial class MainWindow : Window
         _rhythmGroupCharactersRemaining = 0;
         _hasProgress = true;
         SourceBox.IsReadOnly = true;
+        ClipboardButton.IsEnabled = false;
         SourceBox.IsHitTestVisible = false;
         ReadyDelayBox.IsEnabled = false;
         _targetWindow = IntPtr.Zero;
@@ -157,6 +207,7 @@ public sealed partial class MainWindow : Window
             _isPaused = false;
             _isCountingDown = false;
             SourceBox.IsReadOnly = false;
+            ClipboardButton.IsEnabled = true;
             SourceBox.IsHitTestVisible = true;
             SourceBox.SelectionLength = 0;
             ReadyDelayBox.IsEnabled = true;
@@ -861,6 +912,7 @@ public sealed partial class MainWindow : Window
 
     private void MainWindow_Closed(object sender, WindowEventArgs args)
     {
+        _isClosing = true;
         _cancellation?.Cancel();
 
         if (_hotkeyRegistered && !UnregisterHotKey(_windowHandle, GlobalHotkeyId))

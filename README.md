@@ -45,7 +45,7 @@ Compare the result with the hash in the accompanying checksum file.
 
 ## Use the app
 
-1. Paste or enter your text in **Practice text**.
+1. Enter your text in **Practice text**, or click **Paste from clipboard** to replace it with clipboard text. The button is disabled during a run. Empty or non-text clipboard contents leave your current input unchanged.
 2. Adjust the pace, rhythm, mistake chance, and ready delay if needed.
 3. Press **Start**, then click the destination text field during the ready countdown. Alternatively, leave the destination focused and press **Ctrl+Shift+Space**.
 4. Release the hotkey modifiers. Typing begins after the countdown.

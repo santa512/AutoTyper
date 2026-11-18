@@ -25,7 +25,7 @@ Requires Windows 10 version 1809 or later, or Windows 11, on an x64 computer. Na
 
 ## Use
 
-1. Enter the text to send.
+1. Enter the text to send, or click **Paste from clipboard** to replace it with plain clipboard text. Empty, unavailable, non-text, or oversized clipboard contents preserve the input. The button is disabled during a run.
 2. Press **Start**, then focus the destination text field during the countdown. Alternatively, focus the destination first and press **Ctrl+Shift+Space**.
 3. Use that hotkey to pause or resume without bringing Auto Typer forward.
 4. Hover over the small status indicator for details and the full character count.

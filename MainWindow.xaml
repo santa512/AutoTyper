@@ -58,12 +58,21 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
                     <StackPanel Spacing="4">
                         <TextBlock Text="Practice text" FontSize="18" FontWeight="SemiBold" />
                         <TextBlock
                             Text="Edit this text, then press Start or use the selected hotkey."
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
+                        <Button x:Name="ClipboardButton" Grid.Column="1" VerticalAlignment="Center"
+                                Content="Paste from clipboard" Click="ClipboardButton_Click"
+                                ToolTipService.ToolTip="Replace the input with plain text from your clipboard" />
+                    </Grid>
                     <TextBox
                         x:Name="SourceBox"
                         Grid.Row="1"

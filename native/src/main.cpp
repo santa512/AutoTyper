@@ -15,13 +15,14 @@
 namespace {
 constexpr int IconId = 101, TimerId = 1, HotkeyId = 0x4154;
 enum ControlId { Source = 200, Start, Stop, Reset, Pin, Delay, Hotkey, ApplyHotkey,
-                 Pace, Rhythm, Mistakes, Status, PaceLabel, RhythmLabel, MistakeLabel };
+                 Pace, Rhythm, Mistakes, Status, PaceLabel, RhythmLabel, MistakeLabel, ClipboardPaste };
 
 struct App {
     HWND window = nullptr, source = nullptr, start = nullptr, stop = nullptr, reset = nullptr, pin = nullptr;
     HWND delay = nullptr, hotkey = nullptr, apply = nullptr, status = nullptr, heading = nullptr, sourceLabel = nullptr;
     HWND delayLabel = nullptr, hotkeyLabel = nullptr, pace = nullptr, rhythm = nullptr, mistakes = nullptr;
     HWND paceLabel = nullptr, rhythmLabel = nullptr, mistakeLabel = nullptr, tooltip = nullptr;
+    HWND clipboard = nullptr;
     HMODULE richEdit = nullptr;
     HFONT font = nullptr, titleFont = nullptr;
     HBRUSH backgroundBrush = nullptr, fieldBrush = nullptr;
@@ -82,7 +83,8 @@ struct App {
         const int h = MulDiv(rect.bottom, 96, static_cast<int>(dpi));
         place(heading, 16, 10, w - 132, 28);
         place(pin, w - 104, 10, 88, 28);
-        place(sourceLabel, 16, 46, w - 32, 18);
+        place(sourceLabel, 16, 46, w - 206, 18);
+        place(clipboard, w - 174, 40, 158, 24);
         const int editorHeight = std::max(100, h - 228);
         place(source, 16, 68, w - 32, editorHeight);
         RECT textRect{}; GetClientRect(source, &textRect);
@@ -157,6 +159,7 @@ struct App {
         heading = label(L"Auto Typer Compact  v0.1");
         SendMessageW(heading, WM_SETFONT, reinterpret_cast<WPARAM>(titleFont), TRUE);
         pin = button(L"Pin on top", Pin);
+        clipboard = button(L"Paste from clipboard", ClipboardPaste);
         sourceLabel = label(L"Text to type");
         source = control(MSFTEDIT_CLASS, L"", WS_TABSTOP | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_NOHIDESEL, Source);
         SendMessageW(source, EM_SETTEXTMODE, TM_PLAINTEXT, 0);
@@ -209,6 +212,37 @@ struct App {
         textOffsets.push_back(static_cast<LONG>(copied));
         return normalized;
     }
+    void pasteClipboard() {
+        if (running) return;
+        if (!IsClipboardFormatAvailable(CF_UNICODETEXT)) {
+            setStatus(L"Clipboard has no text", L"Copy some text, then try again."); return;
+        }
+        std::wstring text;
+        {
+            if (!OpenClipboard(window)) {
+                setStatus(L"Clipboard is busy", L"Another app is using the clipboard. Try again."); return;
+            }
+            struct ClipboardLock { ~ClipboardLock() { CloseClipboard(); } } clipboardLock;
+            HANDLE handle = GetClipboardData(CF_UNICODETEXT);
+            if (!handle) { setStatus(L"Could not read clipboard"); return; }
+            const auto capacity = GlobalSize(handle) / sizeof(wchar_t);
+            const auto* data = static_cast<const wchar_t*>(GlobalLock(handle));
+            if (!data) { setStatus(L"Could not read clipboard"); return; }
+            struct MemoryLock { HANDLE handle; ~MemoryLock() { GlobalUnlock(handle); } } memoryLock{handle};
+            std::size_t length = 0;
+            while (length < capacity && length <= 500000 && data[length]) ++length;
+            if (length > 500000) {
+                setStatus(L"Clipboard text too long", L"The compact input supports up to 500,000 characters."); return;
+            }
+            if (length == capacity) { setStatus(L"Invalid clipboard text"); return; }
+            if (length == 0) { setStatus(L"Clipboard is empty"); return; }
+            text.assign(data, length);
+        }
+        // Only load text after releasing the clipboard; never start a run here.
+        if (!SetWindowTextW(source, text.c_str())) { setStatus(L"Could not load clipboard text"); return; }
+        SendMessageW(source, EM_SETSEL, 0, 0);
+        setStatus(L"Clipboard text loaded");
+    }
     void highlight(std::size_t offset, std::size_t length = 1) {
         if (textOffsets.empty()) return;
         const auto index = std::min(offset, textOffsets.size() - 1);
@@ -217,7 +251,7 @@ struct App {
         SendMessageW(source, EM_SCROLLCARET, 0, 0);
     }
     void enableOptions(bool enabled) {
-        for (HWND handle : {delay, hotkey, apply, pace, rhythm, mistakes, reset}) EnableWindow(handle, enabled);
+        for (HWND handle : {delay, hotkey, apply, pace, rhythm, mistakes, reset, clipboard}) EnableWindow(handle, enabled);
     }
     void finish(const wchar_t* text, const wchar_t* detail = L"") {
         KillTimer(window, TimerId);
@@ -434,6 +468,7 @@ LRESULT CALLBACK windowProc(HWND window, UINT message, WPARAM wParam, LPARAM lPa
             SetWindowPos(window, app->pinned ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
             SetWindowTextW(app->pin, app->pinned ? L"Pinned on top" : L"Pin on top"); break;
         case ApplyHotkey: if (!app->running) app->changeHotkey(); break;
+        case ClipboardPaste: app->pasteClipboard(); break;
         case Source:
             if (HIWORD(wParam) == EN_CHANGE && !app->running && app->status) {
                 app->progress = app->total = 0; app->setStatus(L"Ready");
