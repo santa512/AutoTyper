@@ -45,7 +45,7 @@ Compare the result with the hash in the accompanying checksum file.
 
 ## Use the app
 
-1. Paste or enter your text in **Practice text**.
+1. Enter your text in **Practice text**, or click **Paste from clipboard** to replace it with clipboard text. The button is disabled during a run. Empty or non-text clipboard contents leave your current input unchanged.
 2. Adjust the pace, rhythm, mistake chance, and ready delay if needed.
 3. Press **Start**, then click the destination text field during the ready countdown. Alternatively, leave the destination focused and press **Ctrl+Shift+Space**.
 4. Release the hotkey modifiers. Typing begins after the countdown.
@@ -142,7 +142,9 @@ Build outputs, downloaded tooling, and local editor settings are excluded from G
 1. Update the version in `AutoTyper.csproj` and the visible badge in `MainWindow.xaml`.
 2. Update this README, the download page, and `CHANGELOG.md`.
 3. Add `release-notes/vX.Y.md`.
-4. Push a matching `vX.Y` tag. The release workflow builds both editions, runs the compact engine tests, generates checksums, and uploads all four files. A manual workflow run can publish only `compact` or `winui` while retaining the other edition's assets.
+4. Configure trusted signing as described in [SIGNING.md](SIGNING.md). Publishing builds both editions, signs and timestamps their EXEs, verifies the signatures, then generates checksums and uploads all four files. A manual run can select an edition; `publish=false` produces unsigned test artifacts without changing the release.
+
+The current v0.1 release is unsigned. A signing account and validated publisher identity must be configured before a signed rebuild can replace it. See [SIGNING.md](SIGNING.md) for the complete setup and verification steps.
 
 The Pages workflow deploys `docs/` when it changes on `main`. Configure **Settings → Pages → Source → GitHub Actions** for the repository.
 
