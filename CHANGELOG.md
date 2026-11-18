@@ -6,6 +6,8 @@ Initial release for Windows x64.
 
 The app and project are now named **Auto Typer**, published from `santa512/AutoTyper`. The renamed executable is `AutoTyper.exe`; the version remains 0.1.
 
+The release also includes **Auto Typer Compact**, a separate native C++ / Win32 implementation with a smaller window and an executable under 1 MB. The download page offers both editions and their checksums.
+
 - Global keyboard output with key-down and key-up events.
 - Adjustable pace, rhythm variation, punctuation pauses, and a default 1% mistake chance.
 - Adjacent-key mistakes with delayed arrow-key and Backspace corrections.
