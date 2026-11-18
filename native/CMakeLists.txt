@@ -16,6 +16,8 @@ target_include_directories(AutoTyperCompact PRIVATE resources)
 target_compile_definitions(AutoTyperCompact PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0A00 WINVER=0x0A00)
 target_link_libraries(AutoTyperCompact PRIVATE typing_engine user32 gdi32 comctl32 dwmapi uxtheme advapi32)
 if(MSVC)
+    # app.rc already embeds the DPI/UAC/common-controls manifest as resource 1.
+    target_link_options(AutoTyperCompact PRIVATE /MANIFEST:NO)
     target_compile_options(typing_engine PRIVATE /W4 /utf-8)
     target_compile_options(AutoTyperCompact PRIVATE /W4 /utf-8 /permissive-)
 else()
