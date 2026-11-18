@@ -23,6 +23,8 @@ assert(html.includes(`VERSION ${version}`) && html.includes(`Download ${tag}`), 
 assert(!/\bWinUI\b|\bWin32\b/i.test(html), 'Public page uses edition names');
 assert(html.indexOf('/AutoTyper.exe"') < html.indexOf('/AutoTyperCompact.exe"'), 'Main app is the default download');
 assert(/14 days/.test(html) && /tray/i.test(html) && /English/.test(html), 'Current features are documented');
+assert(!/\b(?:MiB|KiB)\b/.test(html + readme), 'Public download sizes use decimal units');
+assert(html.includes('114.1 MB') && html.includes('238.6 KB'), 'Offline sizes match the published assets');
 
 async function metadataCase(fail) {
   const labels = { 'AutoTyper.exe': { textContent: 'fallback' }, 'AutoTyperCompact.exe': { textContent: 'fallback' } };
@@ -32,7 +34,7 @@ async function metadataCase(fail) {
       requested = url;
       if (fail) throw new Error('offline');
       return { ok: true, json: async () => ({ assets: [
-        { name: 'AutoTyper.exe', size: 3 * 1048576 }, { name: 'AutoTyperCompact.exe', size: 250 * 1024 }
+        { name: 'AutoTyper.exe', size: 114075145 }, { name: 'AutoTyperCompact.exe', size: 238592 }
       ] }) };
     },
     document: { querySelectorAll: selector => {
@@ -43,8 +45,8 @@ async function metadataCase(fail) {
   });
   await new Promise(setImmediate);
   assert.equal(requested, `https://api.github.com/repos/santa512/AutoTyper/releases/tags/${tag}`);
-  assert.equal(labels['AutoTyper.exe'].textContent, fail ? 'fallback' : '3.0 MiB');
-  assert.equal(labels['AutoTyperCompact.exe'].textContent, fail ? 'fallback' : '250.0 KiB');
+  assert.equal(labels['AutoTyper.exe'].textContent, fail ? 'fallback' : '114.1 MB');
+  assert.equal(labels['AutoTyperCompact.exe'].textContent, fail ? 'fallback' : '238.6 KB');
 }
 await metadataCase(false);
 await metadataCase(true);
