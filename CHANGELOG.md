@@ -3,7 +3,6 @@
 ## Unreleased
 
 - Add a user-activated Paste from clipboard button to both versions; pasting does not start typing and is unavailable during a run.
-- Prepare trusted Authenticode signing and timestamp verification before release publication, with checksums calculated after signing. Publisher identity setup remains required; existing v0.1 downloads are still unsigned.
 
 ## 0.1 — 2026-11-18
 

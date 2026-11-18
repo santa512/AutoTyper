@@ -14,14 +14,9 @@ on:
         type: choice
         options: [both, winui, compact]
         default: both
-      publish:
-        description: Publish a signed release (false builds unsigned test artifacts only)
-        type: boolean
-        default: true
 
 permissions:
   contents: write
-  id-token: write
 
 jobs:
   release:
@@ -29,25 +24,10 @@ jobs:
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
       BUILD_EDITION: ${{ inputs.edition || 'both' }}
-      PUBLISH_RELEASE: ${{ github.event_name != 'workflow_dispatch' || inputs.publish }}
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || env.RELEASE_TAG }}
-      - name: Require trusted signing configuration for publication
-        if: env.PUBLISH_RELEASE == 'true'
-        shell: pwsh
-        env:
-          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
-          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
-          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-          ARTIFACT_SIGNING_ENDPOINT: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
-          ARTIFACT_SIGNING_ACCOUNT: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
-          ARTIFACT_SIGNING_PROFILE: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
-        run: |
-          $required = 'AZURE_CLIENT_ID','AZURE_TENANT_ID','AZURE_SUBSCRIPTION_ID','ARTIFACT_SIGNING_ENDPOINT','ARTIFACT_SIGNING_ACCOUNT','ARTIFACT_SIGNING_PROFILE'
-          $missing = @($required | Where-Object { [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_)) })
-          if ($missing.Count) { throw "Signing is not configured: $($missing -join ', '). See SIGNING.md. Use publish=false for build/test artifacts without replacing the release." }
       - uses: actions/setup-dotnet@v5
         if: env.BUILD_EDITION != 'compact'
         with:
@@ -68,64 +48,17 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Compact tests failed.' }
           New-Item -ItemType Directory -Path native/dist -Force | Out-Null
           Copy-Item native/build/Release/AutoTyperCompact.exe native/dist/AutoTyperCompact.exe
-      - name: Stage selected executables
+      - name: Checksum
         shell: pwsh
         run: |
           $executables = @()
           if ($env:BUILD_EDITION -ne 'compact') { $executables += 'dist/SingleFile-win-x64/AutoTyper.exe' }
           if ($env:BUILD_EDITION -ne 'winui') { $executables += 'native/dist/AutoTyperCompact.exe' }
-          New-Item -ItemType Directory -Path dist/release -Force | Out-Null
           foreach ($exe in $executables) {
-            Copy-Item -LiteralPath $exe -Destination dist/release
+            $hash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $(Split-Path -Leaf $exe)" | Set-Content -LiteralPath "$exe.sha256" -Encoding ascii
           }
-      - name: Authenticate signing identity
-        if: env.PUBLISH_RELEASE == 'true'
-        uses: azure/login@v3
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Authenticode sign and timestamp
-        if: env.PUBLISH_RELEASE == 'true'
-        uses: azure/artifact-signing-action@v2
-        with:
-          endpoint: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
-          signing-account-name: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
-          certificate-profile-name: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
-          files-folder: ${{ github.workspace }}\dist\release
-          files-folder-filter: exe
-          file-digest: SHA256
-          timestamp-rfc3161: http://timestamp.acs.microsoft.com
-          timestamp-digest: SHA256
-      - name: Verify trusted signatures before publication
-        if: env.PUBLISH_RELEASE == 'true'
-        shell: pwsh
-        run: |
-          $executables = @(Get-ChildItem -LiteralPath dist/release -Filter '*.exe' -File)
-          if (!$executables.Count) { throw 'No executables were staged for signing.' }
-          foreach ($exe in $executables) {
-            $signature = Get-AuthenticodeSignature -LiteralPath $exe.FullName
-            if ($signature.Status -ne 'Valid' -or !$signature.SignerCertificate -or !$signature.TimeStamperCertificate) {
-              throw "Trusted timestamped signature verification failed for $($exe.Name): $($signature.Status)"
-            }
-            Write-Output "$($exe.Name): valid signature from $($signature.SignerCertificate.Subject)"
-          }
-      - name: Checksum final executable bytes
-        shell: pwsh
-        run: |
-          foreach ($exe in Get-ChildItem -LiteralPath dist/release -Filter '*.exe' -File) {
-            $hash = (Get-FileHash -LiteralPath $exe.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-            "$hash  $($exe.Name)" | Set-Content -LiteralPath "$($exe.FullName).sha256" -Encoding ascii
-          }
-      - name: Upload unsigned test artifacts
-        if: env.PUBLISH_RELEASE != 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: AutoTyper-unsigned-test-builds
-          path: dist/release/*
-          if-no-files-found: error
       - name: Publish GitHub release
-        if: env.PUBLISH_RELEASE == 'true'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -133,7 +66,6 @@ jobs:
           $notesPath = Join-Path $env:RUNNER_TEMP 'auto-typer-release-notes.md'
           Copy-Item "release-notes/$env:RELEASE_TAG.md" $notesPath
           Add-Content -LiteralPath $notesPath -Value "`nBuild source: https://github.com/${{ github.repository }}/tree/${{ github.sha }}"
-          Add-Content -LiteralPath $notesPath -Value "`nSigning: release executables have verified, timestamped Authenticode signatures."
           gh release view $env:RELEASE_TAG *> $null
           if ($LASTEXITCODE -ne 0) {
             gh release create $env:RELEASE_TAG --verify-tag --title "Auto Typer $env:RELEASE_TAG" --notes-file $notesPath
@@ -142,6 +74,8 @@ jobs:
             gh release edit $env:RELEASE_TAG --title "Auto Typer $env:RELEASE_TAG" --notes-file $notesPath
             if ($LASTEXITCODE -ne 0) { throw 'Could not update release.' }
           }
-          $assets = @(Get-ChildItem -LiteralPath dist/release -File | Select-Object -ExpandProperty FullName)
+          $assets = @()
+          if ($env:BUILD_EDITION -ne 'compact') { $assets += 'dist/SingleFile-win-x64/AutoTyper.exe', 'dist/SingleFile-win-x64/AutoTyper.exe.sha256' }
+          if ($env:BUILD_EDITION -ne 'winui') { $assets += 'native/dist/AutoTyperCompact.exe', 'native/dist/AutoTyperCompact.exe.sha256' }
           gh release upload $env:RELEASE_TAG @assets --clobber
           if ($LASTEXITCODE -ne 0) { throw 'Could not upload release assets.' }

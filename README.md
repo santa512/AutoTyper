@@ -142,9 +142,7 @@ Build outputs, downloaded tooling, and local editor settings are excluded from G
 1. Update the version in `AutoTyper.csproj` and the visible badge in `MainWindow.xaml`.
 2. Update this README, the download page, and `CHANGELOG.md`.
 3. Add `release-notes/vX.Y.md`.
-4. Configure trusted signing as described in [SIGNING.md](SIGNING.md). Publishing builds both editions, signs and timestamps their EXEs, verifies the signatures, then generates checksums and uploads all four files. A manual run can select an edition; `publish=false` produces unsigned test artifacts without changing the release.
-
-The current v0.1 release is unsigned. A signing account and validated publisher identity must be configured before a signed rebuild can replace it. See [SIGNING.md](SIGNING.md) for the complete setup and verification steps.
+4. Push a matching `vX.Y` tag. The release workflow builds both editions, runs the compact engine tests, generates checksums, and uploads all four files. A manual workflow run can publish only `compact` or `winui` while retaining the other edition's assets.
 
 The Pages workflow deploys `docs/` when it changes on `main`. Configure **Settings → Pages → Source → GitHub Actions** for the repository.
 
