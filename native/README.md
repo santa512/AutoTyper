@@ -1,6 +1,6 @@
 # Auto Typer Compact
 
-**Version 0.1 · C++17 · Win32 · Windows x64**
+**Version 0.2 · C++17 · Win32 · Windows x64**
 
 A separate, standalone native implementation of Auto Typer. It uses Windows controls, Rich Edit, and `SendInput` directly. The original C# / WinUI project remains in the parent directory.
 

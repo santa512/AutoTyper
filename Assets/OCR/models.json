@@ -1,0 +1,13 @@
+{
+  "pipeline": "RapidOcrNet 4.2.0 / PaddleOCR PP-OCRv5 / ONNX Runtime CPU",
+  "recognizer": {
+    "source": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.10.0/onnx/PP-OCRv5/rec/en_PP-OCRv5_rec_mobile.onnx",
+    "sha256": "c3461add59bb4323ecba96a492ab75e06dda42467c9e3d0c18db5d1d21924be8"
+  },
+  "dictionary": {
+    "source": "https://www.modelscope.cn/models/RapidAI/RapidOCR/resolve/v3.10.0/paddle/PP-OCRv5/rec/en_PP-OCRv5_rec_mobile/ppocrv5_en_dict.txt",
+    "sha256": "e025a66d31f327ba0c232e03f407ae8d105e1e709e7ccb3f408aa778c24e70d6"
+  },
+  "detectorSha256": "4d97c44a20d30a81aad087d6a396b08f786c4635742afc391f6621f5c6ae78ae",
+  "classifierSha256": "54379ae5174d026780215fc748a7f31910dee36818e63d49e17dc598ecc82df7"
+}

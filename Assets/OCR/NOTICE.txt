@@ -1,0 +1,9 @@
+PaddleOCR English models (PP-OCRv5), Apache License 2.0.
+English recognizer: RapidAI/RapidOCR v3.10.0, en_PP-OCRv5_rec_mobile.onnx
+Published SHA-256: c3461add59bb4323ecba96a492ab75e06dda42467c9e3d0c18db5d1d21924be8
+Model URLs and checksums: https://github.com/RapidAI/RapidOCR/blob/main/python/rapidocr/default_models.yaml
+Detector/classifier: RapidOcrNet NuGet 4.2.0 (PaddleOCR/RapidOCR models).
+Inference pipeline: https://github.com/BobLd/RapidOcrNet (Apache-2.0)
+ONNX Runtime: https://github.com/microsoft/onnxruntime (MIT)
+SkiaSharp: https://github.com/mono/SkiaSharp (MIT)
+No models are downloaded at app runtime. Only English recognition is configured.
