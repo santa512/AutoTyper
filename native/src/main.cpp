@@ -159,8 +159,8 @@ struct App {
         heading = label(L"Auto Typer Compact  v0.1");
         SendMessageW(heading, WM_SETFONT, reinterpret_cast<WPARAM>(titleFont), TRUE);
         pin = button(L"Pin on top", Pin);
-        sourceLabel = label(L"Text to type");
         clipboard = button(L"Paste from clipboard", ClipboardPaste);
+        sourceLabel = label(L"Text to type");
         source = control(MSFTEDIT_CLASS, L"", WS_TABSTOP | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL | ES_NOHIDESEL, Source);
         SendMessageW(source, EM_SETTEXTMODE, TM_PLAINTEXT, 0);
         SendMessageW(source, EM_EXLIMITTEXT, 0, 500000);
