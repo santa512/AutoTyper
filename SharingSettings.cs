@@ -81,6 +81,8 @@ internal static class SharingSettingsStore
         File.WriteAllText(SettingsPath, json);
     }
 
+    internal static void Clear() { if (File.Exists(SettingsPath)) File.Delete(SettingsPath); }
+
     // DPAPI ties the saved configuration to the current Windows user. No credentials ship in the EXE.
     internal static byte[] Protect(byte[] data, bool encrypt)
     {

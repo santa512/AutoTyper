@@ -156,7 +156,7 @@ struct App {
         richEdit = LoadLibraryW(L"Msftedit.dll");
         if (!richEdit) return false;
         updateFonts();
-        heading = label(L"Auto Typer Compact  v0.2");
+        heading = label(L"Auto Typer Compact  v0.2.1");
         SendMessageW(heading, WM_SETFONT, reinterpret_cast<WPARAM>(titleFont), TRUE);
         pin = button(L"Pin on top", Pin);
         clipboard = button(L"Paste from clipboard", ClipboardPaste);

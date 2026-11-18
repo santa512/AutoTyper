@@ -1,19 +1,19 @@
 # Auto Typer
 
-**Version 0.2** · Windows desktop · x64
+**Version 0.2.1** · Windows desktop · x64
 
 Type into other apps with a natural rhythm, capture screenshots, scan QR codes, extract English text offline, and share screenshot links. Global shortcuts and optional tray mode keep the tools within reach.
 
-**[Download Auto Typer](https://santa512.github.io/AutoTyper/#downloads)** · **[v0.2 release](https://github.com/santa512/AutoTyper/releases/tag/v0.2)** · **[Changelog](CHANGELOG.md)**
+**[Download Auto Typer](https://santa512.github.io/AutoTyper/#downloads)** · **[v0.2.1 release](https://github.com/santa512/AutoTyper/releases/tag/v0.2.1)** · **[Changelog](CHANGELOG.md)**
 
 ## Choose your download
 
-Both editions are version 0.2 for Windows x64. The recommended download includes the screen tools and tray features. Compact keeps the smaller typing-focused interface.
+Both editions are version 0.2.1 for Windows x64. The recommended download includes the screen tools and tray features. Compact keeps the smaller typing-focused interface.
 
 | Edition | Download | Size | Included |
 | --- | --- | --- | --- |
-| **Auto Typer — recommended** | [AutoTyper.exe](https://github.com/santa512/AutoTyper/releases/download/v0.2/AutoTyper.exe) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.2/AutoTyper.exe.sha256) | About 114.1 MB | Typing, clipboard paste, QR scanning, English OCR, screenshot save/copy, R2 sharing and history, five global hotkeys, saved settings, single-instance behavior and tray mode. |
-| **Auto Typer Compact** | [AutoTyperCompact.exe](https://github.com/santa512/AutoTyper/releases/download/v0.2/AutoTyperCompact.exe) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.2/AutoTyperCompact.exe.sha256) | Under 1 MB | A lighter typing app with clipboard paste, natural rhythm, corrections, highlighting, a global typing hotkey and pin on top. No screen tools, OCR, sharing or tray menu. |
+| **Auto Typer — recommended** | [AutoTyper.exe](https://github.com/santa512/AutoTyper/releases/download/v0.2.1/AutoTyper.exe) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.2.1/AutoTyper.exe.sha256) | About 114.1 MB | Typing, clipboard paste, QR scanning, English OCR, screenshot save/copy, R2 sharing and history, clipboard translation, six global hotkeys, encrypted settings backups, single-instance behavior and tray mode. |
+| **Auto Typer Compact** | [AutoTyperCompact.exe](https://github.com/santa512/AutoTyper/releases/download/v0.2.1/AutoTyperCompact.exe) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.2.1/AutoTyperCompact.exe.sha256) | Under 1 MB | A lighter typing app with clipboard paste, natural rhythm, corrections, highlighting, a global typing hotkey and pin on top. No screen tools, OCR, sharing or tray menu. |
 
 The guide below describes the recommended app; see the [Compact guide](native/README.md) for its usage and build instructions. Run one edition at a time to avoid conflicts between their typing shortcuts. Single-instance behavior applies to copies of the recommended app; Compact remains a separate application.
 
@@ -25,12 +25,12 @@ The guide below describes the recommended app; see the [Compact guide](native/RE
 
 Only your chosen EXE is needed; the checksum is optional verification. Do not download the source ZIP to run the app. The main download is about 114.1 MB because it bundles its runtimes and offline OCR. Compact is under 1 MB and uses Windows system components directly.
 
-**Upgrading:** choose **Exit** in the old tray menu before starting v0.2. Closing a tray-enabled window only hides it. Existing compatible settings and local sharing history are retained. These executables are unsigned, so Windows may show an unknown-publisher or reputation prompt.
+**Upgrading:** choose **Exit** in the old tray menu before starting v0.2.1. Closing a tray-enabled window only hides it. Existing compatible settings and local sharing history are retained. These executables are unsigned, so Windows may show an unknown-publisher or reputation prompt.
 
 ### Requirements
 
 - Windows 10 version 1809 or later, or Windows 11.
-- An x64 computer. Version 0.2 does not ship separate x86 or ARM64 binaries.
+- An x64 computer. Version 0.2.1 does not ship separate x86 or ARM64 binaries.
 - A destination application that accepts simulated Windows keyboard input.
 
 ### Verify the download
@@ -56,6 +56,22 @@ Compare the result with the hash in the accompanying checksum file.
 The input text stays read-only during a run. The current character is highlighted even while the destination app has focus; during corrections, the highlight returns to the character being fixed. A thin, full-width progress line sits below the input, with the character count and status above it. Hover over status for activity details.
 
 **Stop** ends the run. **Reset progress** clears progress without deleting your text. **Pin on top** keeps the window visible above other apps. The Start/Pause and Stop controls remain in the bottom-right corner.
+
+## Clipboard translation
+
+In **Settings → Translation**, enter your **Microsoft Translator API key** and **Azure resource region** from your resource's Keys and Endpoint page, then Save. Regional and multi-service resources require their region (for example `eastus`); global Translator resources leave it blank. The translate button stays disabled until API settings are configured and is disabled again if you clear the key. Copy text, choose a target language from the dropdown beside the input heading (English by default), and click the translate icon. The input shows both **Original** and **Translation (language)**, preserving the original text. Source language is detected automatically. The target language persists between launches.
+
+Translation runs only when clicked and sends clipboard text to Microsoft's Translator API. It requires internet access and your Azure subscription's API quota. The key is encrypted for your Windows account in `%LOCALAPPDATA%\AutoTyper\translation.dat`. Old Gemini keys are discarded when loading previous translation settings; your chosen language is preserved. Saving checks configuration format; authorization is verified on the first translation. See Microsoft's [authentication guide](https://learn.microsoft.com/en-us/azure/ai-services/translator/text-translation/reference/authentication) and [Translate API reference](https://learn.microsoft.com/en-us/azure/ai-services/translator/text-translation/reference/v3/translate).
+
+**Copy result to clipboard** also copies the combined original and translation when enabled. **Stop** cancels translation; failed, timed-out, blocked or incomplete responses preserve the existing input. Clipboard text is limited to 20,000 characters per request. The app does not watch the clipboard or translate automatically in the background.
+
+Run `dotnet run --project tests/Translation.Tests -c Release` to check request construction, response handling, errors, cancellation, configuration availability and encrypted settings without sending text to Microsoft. A live translation requires your own API key.
+
+## Export and import settings
+
+Open **Settings → Export / Import** and enter a backup password of at least eight characters. **Export settings** saves an encrypted `.autotyper` file containing the current typing settings, all six hotkeys, Cloudflare configuration and both R2 keys, and Microsoft Translator configuration and API key. The backup can be imported on another PC using the same password. It uses AES-256-GCM encryption with a password-derived key; the password is not stored and cannot be recovered.
+
+**Import settings** loads the backup into Settings for review. **Save** applies and persists imported values, checking hotkey availability on this PC. **Back → No** discards the import. Wrong passwords and damaged files leave settings unchanged. Backups contain configuration; input text and shared URL history are not included.
 
 ## One running instance
 
@@ -89,7 +105,7 @@ After a successful save or copy, Auto Typer sends a **Windows notification** wit
 
 The app normalizes dark and low-contrast regions and enlarges small text before recognition. Low-contrast input or uncertain character scores show a review hint. Tiny punctuation, blur, unusual fonts, and complicated layouts can still cause mistakes—even when the model's confidence is high. Review important text before typing it into another app. Recognition is currently configured for English only; the Compact edition is unchanged.
 
-OCR model sources, versions, checksums, and license notices are included under `Assets/OCR/`. Small notification previews are the only screenshot images cached to disk; OCR processes its selected region in memory. The v0.2 main download bundles the inference engine and models, so it is larger than v0.1. No model downloads are needed at runtime.
+OCR model sources, versions, checksums, and license notices are included under `Assets/OCR/`. Small notification previews are the only screenshot images cached to disk; OCR processes its selected region in memory. The v0.2.1 main download bundles the inference engine and models, so it is larger than v0.1. No model downloads are needed at runtime.
 
 ### Share screenshots to R2
 
@@ -124,11 +140,12 @@ Run `dotnet run --project tests/Ocr.Tests` on Windows x64 with .NET 10. The eigh
 | Instant share hotkey | Ctrl+Shift+I | Selects a region to upload to the configured R2 bucket. |
 | QR hotkey | Ctrl+Shift+Q | Selects a region to scan for a QR code. |
 | Text extract hotkey | Ctrl+Shift+E | Selects a region for English OCR. |
+| Instant translate hotkey | Ctrl+Shift+T | Translates clipboard text and brings the result window forward; active after Microsoft Translator is configured. |
 | Pin on top | Off | Keeps the app above other windows. |
 
 In **Settings → Hotkeys**, click the pencil beside an action, hold Ctrl, Alt, Shift, or Windows, and press another key. Escape cancels recording. Each action needs a distinct shortcut. **Save** checks registration with Windows and applies the shortcuts; **Back** asks whether to save unsaved changes; Yes saves and No discards. Shortcuts pause while Settings is open so recording does not invoke tools. Unavailable combinations are reported in Hotkeys. Available shortcuts remain active when another application's shortcut conflicts at startup. Button tooltips show their configured shortcuts and mark unavailable registrations.
 
-Typing settings and all five shortcuts persist between launches. Existing saved delay preferences are preserved; the default for new settings is 3 seconds. Each new Start begins typing from the start of the input text. Pause/Resume continues the current run.
+Typing settings and all six shortcuts persist between launches. Existing saved delay preferences are preserved; the default for new settings is 3 seconds. Each new Start begins typing from the start of the input text. Pause/Resume continues the current run.
 
 ## How external typing behaves
 

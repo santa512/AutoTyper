@@ -23,6 +23,7 @@ assert(html.includes(`VERSION ${version}`) && html.includes(`Download ${tag}`), 
 assert(!/\bWinUI\b|\bWin32\b/i.test(html), 'Public page uses edition names');
 assert(html.indexOf('/AutoTyper.exe"') < html.indexOf('/AutoTyperCompact.exe"'), 'Main app is the default download');
 assert(/14 days/.test(html) && /tray/i.test(html) && /English/.test(html), 'Current features are documented');
+assert(/Microsoft Translator/.test(html) && /encrypted backup/.test(html) && /Six global shortcuts/.test(html), 'Translation, backup and sixth hotkey are documented');
 assert(!/\b(?:MiB|KiB)\b/.test(html + readme), 'Public download sizes use decimal units');
 assert(html.includes('114.1 MB') && html.includes('238.6 KB'), 'Offline sizes match the published assets');
 

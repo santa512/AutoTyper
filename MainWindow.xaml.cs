@@ -71,6 +71,10 @@ public sealed partial class MainWindow : Window
     private InMemoryRandomAccessStream? _screenshotClipboardStream;
     private CancellationTokenSource? _ocrCancellation;
     private CancellationTokenSource? _shareCancellation;
+    private CancellationTokenSource? _translationCancellation;
+    private TranslationSettings _translationSettings = new();
+    private TranslationSettings? _translationBeforeSettings;
+    private string _translationDraftLanguage = "English";
     private SharingSettings? _sharingSettings;
     private TaskCompletionSource<SharingSettings?>? _sharingCompletion;
     private TypingSettings? _typingBeforeSettings;
@@ -82,6 +86,7 @@ public sealed partial class MainWindow : Window
     private bool _isInTray;
     private bool _exitRequested;
     private static readonly HttpClient ShareHttpClient = ScreenshotShareClient.CreateHttpClient();
+    private static readonly HttpClient TranslationHttpClient = MicrosoftTranslator.CreateHttpClient();
     internal ScreenRegion? SelectedRegion { get; private set; }
 
     private void SetRegionToolsEnabled(bool enabled)
@@ -92,6 +97,8 @@ public sealed partial class MainWindow : Window
         RefreshActionTooltips();
         CopyResultToggle.IsEnabled = enabled;
         SharingSettingsButton.IsEnabled = enabled;
+        TranslationLanguage.IsEnabled = enabled;
+        TranslateButton.IsEnabled = enabled && _translationSettings.IsConfigured;
     }
 
     private async void RegionButton_Click(object sender, RoutedEventArgs e)
@@ -318,7 +325,7 @@ public sealed partial class MainWindow : Window
         _isSelectingRegion = true;
         SetRegionToolsEnabled(false);
         StartPauseButton.IsEnabled = ClipboardButton.IsEnabled = false;
-        try { _sharingSettings = await ConfigureSharingAsync() ?? _sharingSettings; }
+        try { await ConfigureSharingAsync(); }
         finally
         {
             _isSelectingRegion = false;
@@ -331,9 +338,14 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async Task<SharingSettings?> ConfigureSharingAsync(bool requireSharing = false)
+    private async Task<SharingSettings?> ConfigureSharingAsync(bool requireSharing = false, string? initialSection = null)
     {
         _typingBeforeSettings = CaptureTypingSettings();
+        _translationBeforeSettings = _translationSettings;
+        _translationDraftLanguage = _translationSettings.TargetLanguage;
+        BackupPassword.Password = BackupStatusText.Text = "";
+        TranslationApiKey.Password = _translationSettings.ApiKey;
+        TranslationRegion.Text = _translationSettings.Region;
         _draftHotkeys = new(_activeHotkeys);
         _globalHotkeys?.Release();
         UpdateHotkeyLabels();
@@ -355,7 +367,7 @@ public sealed partial class MainWindow : Window
         SharingPanel.Visibility = Visibility.Visible;
         RecordHotkeyButton.IsEnabled = _windowSubclassed;
         SettingsScroller.UpdateLayout();
-        ScrollToSettingsSection(requireSharing ? "Cloud" : "Typing");
+        ScrollToSettingsSection(initialSection ?? (requireSharing ? "Cloud" : "Typing"));
         if (requireSharing) SharingAccount.Focus(FocusState.Programmatic);
         else TypingSettingsTab.Focus(FocusState.Programmatic);
         try { return await _sharingCompletion.Task; }
@@ -368,6 +380,9 @@ public sealed partial class MainWindow : Window
             SharingPanel.Visibility = Visibility.Collapsed;
             MainContent.Visibility = Visibility.Visible;
             SharingAccessKey.Password = SharingSecretKey.Password = "";
+            TranslationApiKey.Password = "";
+            BackupPassword.Password = "";
+            _translationBeforeSettings = null;
             _cloudBeforeSettings = [];
             _sharingCompletion = null;
         }
@@ -383,6 +398,7 @@ public sealed partial class MainWindow : Window
     private void SharingBack_Click(object sender, RoutedEventArgs e)
     {
         bool changed = CaptureTypingSettings(useDraft: true) != _typingBeforeSettings
+            || CaptureTranslationSettings() != _translationBeforeSettings
             || !CaptureCloudSettingsValues().SequenceEqual(_cloudBeforeSettings);
         if (changed) UnsavedChangesPrompt.Visibility = Visibility.Visible;
         else _sharingCompletion?.TrySetResult(null);
@@ -406,13 +422,20 @@ public sealed partial class MainWindow : Window
             };
             TypingSettings typing = CaptureTypingSettings(useDraft: true);
             typing.Validate();
+            TranslationSettings translation = CaptureTranslationSettings();
+            translation.Validate(requireKey: false);
             bool hasCloudSettings = new[] { settings.AccountId, settings.BucketName, settings.AccessKeyId, settings.SecretAccessKey }
                 .Any(value => !string.IsNullOrWhiteSpace(value));
             if (hasCloudSettings || _sharingRequired) settings.Validate();
-            if (_windowSubclassed && _globalHotkeys?.TryApply(BuildHotkeyRegistrations(typing.GetHotkeys())) == false)
+            if (_windowSubclassed && _globalHotkeys?.TryApply(BuildHotkeyRegistrations(typing.GetHotkeys(), translation.IsConfigured)) == false)
                 throw new InvalidOperationException($"Could not register {_globalHotkeys.FailedAction}. Choose another shortcut in Hotkeys; another app may be using it.");
             if (hasCloudSettings || _sharingRequired) SharingSettingsStore.Save(settings);
+            else SharingSettingsStore.Clear();
             TypingSettingsStore.Save(typing);
+            TranslationSettingsStore.Save(translation);
+            _translationSettings = translation;
+            TranslationLanguage.SelectedItem = translation.TargetLanguage;
+            _sharingSettings = hasCloudSettings ? settings : null;
             ApplyTypingSettings(typing);
             _settingsSaved = true;
             _sharingCompletion?.TrySetResult(hasCloudSettings ? settings : null);
@@ -421,8 +444,103 @@ public sealed partial class MainWindow : Window
             or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
         {
             _globalHotkeys?.Release();
-            SharingError.Text = exception is InvalidOperationException ? exception.Message : "Could not save sharing settings. Try again.";
+            SharingError.Text = exception is InvalidOperationException ? exception.Message : "Could not save settings. Try again.";
         }
+    }
+
+    private SettingsBundle CaptureSettingsBackup()
+    {
+        var cloud = new SharingSettings
+        {
+            AccountId = SharingAccount.Text.Trim(), BucketName = SharingBucket.Text.Trim(),
+            AccessKeyId = SharingAccessKey.Password.Trim(), SecretAccessKey = SharingSecretKey.Password.Trim(),
+            Jurisdiction = (string)((ComboBoxItem)SharingJurisdiction.SelectedItem).Tag,
+            PublicBaseUrl = SharingPublicUrl.Text.Trim()
+        };
+        bool hasCloud = new[] { cloud.AccountId, cloud.BucketName, cloud.AccessKeyId, cloud.SecretAccessKey }
+            .Any(value => !string.IsNullOrWhiteSpace(value));
+        var bundle = new SettingsBundle(CaptureTypingSettings(useDraft: true), hasCloud ? cloud : null, CaptureTranslationSettings());
+        bundle.Validate();
+        return bundle;
+    }
+
+    private async void ExportSettings_Click(object sender, RoutedEventArgs e)
+    {
+        if (_sharingCompletion is null || _isClosing) return;
+        try
+        {
+            string password = BackupPassword.Password;
+            SettingsBackup.ValidatePassword(password);
+            SettingsBundle bundle = CaptureSettingsBackup();
+            SharingPanel.IsEnabled = false;
+            var picker = new Microsoft.Windows.Storage.Pickers.FileSavePicker(AppWindow.Id)
+            {
+                SuggestedFileName = $"AutoTyper-Settings-{DateTime.Now:yyyy-MM-dd}",
+                DefaultFileExtension = ".autotyper"
+            };
+            picker.FileTypeChoices.Add("Encrypted Auto Typer settings", new List<string> { ".autotyper" });
+            var file = await picker.PickSaveFileAsync();
+            if (_isClosing) return;
+            if (file is null) { BackupStatusText.Text = "Export cancelled."; return; }
+            byte[] data = await Task.Run(() => SettingsBackup.Export(bundle, password));
+            if (_isClosing) return;
+            await File.WriteAllBytesAsync(file.Path, data);
+            if (!_isClosing) BackupStatusText.Text = "Settings exported with all configured keys. Keep the backup password.";
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or IOException or UnauthorizedAccessException or COMException)
+        {
+            if (!_isClosing) BackupStatusText.Text = exception is InvalidOperationException
+                ? exception.Message : "Could not export settings. Try another location.";
+        }
+        finally { if (!_isClosing) SharingPanel.IsEnabled = true; }
+    }
+
+    private async void ImportSettings_Click(object sender, RoutedEventArgs e)
+    {
+        if (_sharingCompletion is null || _isClosing) return;
+        try
+        {
+            string password = BackupPassword.Password;
+            SettingsBackup.ValidatePassword(password);
+            SharingPanel.IsEnabled = false;
+            var picker = new Microsoft.Windows.Storage.Pickers.FileOpenPicker(AppWindow.Id);
+            picker.FileTypeFilter.Add(".autotyper");
+            var file = await picker.PickSingleFileAsync();
+            if (_isClosing) return;
+            if (file is null) { BackupStatusText.Text = "Import cancelled."; return; }
+            if (new FileInfo(file.Path).Length > SettingsBackup.MaximumFileBytes)
+                throw new InvalidOperationException("The settings backup is too large.");
+            byte[] data = await File.ReadAllBytesAsync(file.Path);
+            SettingsBundle bundle = await Task.Run(() => SettingsBackup.Import(data, password));
+            if (_isClosing) return;
+            var typing = bundle.Typing;
+            PaceSlider.Value = typing.Pace;
+            RhythmSlider.Value = typing.Rhythm;
+            MistakeSlider.Value = typing.MistakeChance;
+            ReadyDelayBox.Value = typing.DelaySeconds;
+            MinimizeToTrayToggle.IsOn = typing.MinimizeToTray;
+            _draftHotkeys = typing.GetHotkeys();
+            UpdateHotkeyLabels();
+            var cloud = bundle.Sharing ?? new SharingSettings();
+            SharingAccount.Text = cloud.AccountId;
+            SharingBucket.Text = cloud.BucketName;
+            SharingAccessKey.Password = cloud.AccessKeyId;
+            SharingSecretKey.Password = cloud.SecretAccessKey;
+            SharingPublicUrl.Text = cloud.PublicBaseUrl;
+            SharingJurisdiction.SelectedIndex = cloud.Jurisdiction switch { "eu" => 1, "us" => 2, "fedramp" => 3, _ => 0 };
+            TranslationApiKey.Password = bundle.Translation.ApiKey;
+            TranslationRegion.Text = bundle.Translation.Region;
+            _translationDraftLanguage = bundle.Translation.TargetLanguage;
+            UnsavedChangesPrompt.Visibility = Visibility.Collapsed;
+            SharingError.Text = "";
+            BackupStatusText.Text = "Backup loaded for review. Save applies imported settings and keys; Back lets you discard them.";
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or IOException or UnauthorizedAccessException or COMException)
+        {
+            if (!_isClosing) BackupStatusText.Text = exception is InvalidOperationException
+                ? exception.Message : "Could not import settings. Check the file and try again.";
+        }
+        finally { if (!_isClosing) SharingPanel.IsEnabled = true; }
     }
 
     internal void ActivateFromNotification()
@@ -449,7 +567,7 @@ public sealed partial class MainWindow : Window
             DelaySeconds = ReadyDelayBox.Value, HotkeyModifiers = keys["Typing"].Modifiers,
             HotkeyKey = keys["Typing"].Key, HotkeyLabel = keys["Typing"].Label,
             ScreenshotHotkey = keys["Screenshot"], ShareHotkey = keys["Share"],
-            QrHotkey = keys["QR"], TextExtractHotkey = keys["Text Extract"]
+            QrHotkey = keys["QR"], TextExtractHotkey = keys["Text Extract"], TranslateHotkey = keys["Translate"]
         };
     }
 
@@ -524,7 +642,7 @@ public sealed partial class MainWindow : Window
 
     private void ScrollToSettingsSection(string section)
     {
-        FrameworkElement target = section switch { "Cloud" => CloudSettingsSection, "Hotkeys" => HotkeysSettingsSection, _ => TypingSettingsSection };
+        FrameworkElement target = section switch { "Backup" => BackupSettingsSection, "Translation" => TranslationSettingsSection, "Cloud" => CloudSettingsSection, "Hotkeys" => HotkeysSettingsSection, _ => TypingSettingsSection };
         double offset = target.TransformToVisual(SettingsSections).TransformPoint(new(0, 0)).Y;
         SettingsScroller.ChangeView(null, offset, null, disableAnimation: true);
         SetSettingsSectionSelection(section);
@@ -535,14 +653,19 @@ public sealed partial class MainWindow : Window
         TypingSettingsTab.IsChecked = section == "Typing";
         CloudSettingsTab.IsChecked = section == "Cloud";
         HotkeysSettingsTab.IsChecked = section == "Hotkeys";
+        TranslationSettingsTab.IsChecked = section == "Translation";
+        BackupSettingsTab.IsChecked = section == "Backup";
     }
 
     private void SettingsScroller_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
     {
-        if (HotkeysSettingsSection is null || SettingsSections is null || TypingSettingsTab is null || HotkeysSettingsTab is null) return;
+        if (BackupSettingsSection is null || BackupSettingsTab is null || TranslationSettingsSection is null || TranslationSettingsTab is null || HotkeysSettingsSection is null || SettingsSections is null || TypingSettingsTab is null || HotkeysSettingsTab is null) return;
         double cloudOffset = CloudSettingsSection.TransformToVisual(SettingsSections).TransformPoint(new(0, 0)).Y;
         double keysOffset = HotkeysSettingsSection.TransformToVisual(SettingsSections).TransformPoint(new(0, 0)).Y;
-        SetSettingsSectionSelection(SettingsScroller.VerticalOffset >= keysOffset - 10 ? "Hotkeys"
+        double translationOffset = TranslationSettingsSection.TransformToVisual(SettingsSections).TransformPoint(new(0, 0)).Y;
+        double backupOffset = BackupSettingsSection.TransformToVisual(SettingsSections).TransformPoint(new(0, 0)).Y;
+        bool atEnd = SettingsScroller.VerticalOffset > 0 && SettingsScroller.VerticalOffset >= SettingsScroller.ScrollableHeight - 1;
+        SetSettingsSectionSelection(atEnd || SettingsScroller.VerticalOffset >= backupOffset - 10 ? "Backup" : SettingsScroller.VerticalOffset >= translationOffset - 10 ? "Translation" : SettingsScroller.VerticalOffset >= keysOffset - 10 ? "Hotkeys"
             : SettingsScroller.VerticalOffset >= cloudOffset - 10 ? "Cloud" : "Typing");
     }
 
@@ -680,6 +803,9 @@ public sealed partial class MainWindow : Window
     {
         _windowSubclassProc = WindowSubclassProc;
         InitializeComponent();
+        _translationSettings = TranslationSettingsStore.Load();
+        TranslationLanguage.ItemsSource = TranslationSettings.Languages;
+        TranslationLanguage.SelectedItem = _translationSettings.TargetLanguage;
         ApplyTypingSettings(TypingSettingsStore.Load());
         _sharingSettings = SharingSettingsStore.Load();
         SetRegionToolsEnabled(true);
@@ -691,6 +817,102 @@ public sealed partial class MainWindow : Window
         UpdateOptionLabels();
         UpdateProgressText();
         Closed += MainWindow_Closed;
+    }
+
+    private TranslationSettings CaptureTranslationSettings() => new()
+    {
+        ApiKey = TranslationApiKey.Password.Trim(), Region = TranslationRegion.Text.Trim().ToLowerInvariant(),
+        TargetLanguage = _translationDraftLanguage
+    };
+
+    private void TranslationLanguage_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (TranslationLanguage.SelectedItem is not string language || language == _translationSettings.TargetLanguage) return;
+        var updated = _translationSettings with { TargetLanguage = language };
+        try
+        {
+            TranslationSettingsStore.Save(updated);
+            _translationSettings = updated;
+            SetRegionToolsEnabled(!_isRunning && !_isReadingClipboard && !_isSelectingRegion);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+            or System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            TranslationLanguage.SelectedItem = _translationSettings.TargetLanguage;
+            StatusText.Text = "Could not save the translation language. Try again.";
+        }
+    }
+
+    private async void TranslateButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isRunning || _isReadingClipboard || _isSelectingRegion || _isClosing) return;
+        if (!_translationSettings.IsConfigured)
+        {
+            RegionSelectionText.Text = "Configure Microsoft Translator in Settings → Translation first.";
+            return;
+        }
+        _isReadingClipboard = true;
+        _translationCancellation = new CancellationTokenSource();
+        CancellationToken token = _translationCancellation.Token;
+        TranslationSettings settings = _translationSettings;
+        bool copyResult = CopyResultToggle.IsOn;
+        SetRegionToolsEnabled(false);
+        ClipboardButton.IsEnabled = StartPauseButton.IsEnabled = false;
+        SourceBox.IsReadOnly = true;
+        StopButton.IsEnabled = true;
+        EndHotkeyRecording();
+        try
+        {
+            var clipboard = Clipboard.GetContent();
+            if (!clipboard.Contains(StandardDataFormats.Text))
+                throw new InvalidOperationException("The clipboard does not contain text to translate.");
+            string original = await clipboard.GetTextAsync();
+            if (_isClosing) return;
+            token.ThrowIfCancellationRequested();
+            StatusText.Text = "Translating…";
+            RegionSelectionText.Text = $"Translating clipboard text into {settings.TargetLanguage}…";
+            TypingProgressBar.IsIndeterminate = true;
+            string translated = await new MicrosoftTranslator(TranslationHttpClient).TranslateAsync(original, settings, token);
+            if (_isClosing) return;
+            token.ThrowIfCancellationRequested();
+            string result = MicrosoftTranslator.FormatResult(original, translated, settings.TargetLanguage);
+            var content = new DataPackage();
+            content.SetText(result);
+            ApplyToolResult("Translation", result, content, copyResult);
+            StatusText.Text = "Translation loaded";
+            ActivateExistingWindow();
+        }
+        catch (OperationCanceledException)
+        {
+            if (!_isClosing)
+            {
+                StatusText.Text = token.IsCancellationRequested ? "Translation cancelled" : "Translation timed out";
+                RegionSelectionText.Text = token.IsCancellationRequested ? "Translation cancelled." : "Microsoft Translator took too long. Try again.";
+            }
+        }
+        catch (InvalidOperationException exception)
+        {
+            if (!_isClosing) { StatusText.Text = "Translation unavailable"; RegionSelectionText.Text = exception.Message; }
+        }
+        catch (Exception exception) when (exception is HttpRequestException or COMException or UnauthorizedAccessException or IOException)
+        {
+            if (!_isClosing) { StatusText.Text = "Could not translate"; RegionSelectionText.Text = "Check your connection and clipboard, then try again."; }
+        }
+        finally
+        {
+            _translationCancellation.Dispose();
+            _translationCancellation = null;
+            _isReadingClipboard = false;
+            if (!_isClosing)
+            {
+                TypingProgressBar.IsIndeterminate = false;
+                SourceBox.IsReadOnly = false;
+                StopButton.IsEnabled = false;
+                SetRegionToolsEnabled(true);
+                ClipboardButton.IsEnabled = StartPauseButton.IsEnabled = true;
+                RecordHotkeyButton.IsEnabled = _windowSubclassed;
+            }
+        }
     }
 
     private async void ClipboardButton_Click(object sender, RoutedEventArgs e)
@@ -854,6 +1076,7 @@ public sealed partial class MainWindow : Window
     private void StopButton_Click(object sender, RoutedEventArgs e)
     {
         _shareCancellation?.Cancel();
+        _translationCancellation?.Cancel();
         _ocrCancellation?.Cancel();
         _cancellation?.Cancel();
         _resumeSignal?.TrySetResult(true);
@@ -861,7 +1084,7 @@ public sealed partial class MainWindow : Window
 
     private void ResetButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_isRunning)
+        if (_isRunning || _isReadingClipboard || _isSelectingRegion)
         {
             return;
         }
@@ -1253,7 +1476,7 @@ public sealed partial class MainWindow : Window
     private Dictionary<string, TextBox> HotkeyInputs => new()
     {
         ["Typing"] = HotkeyInput, ["Screenshot"] = ScreenshotHotkeyInput, ["Share"] = ShareHotkeyInput,
-        ["QR"] = QrHotkeyInput, ["Text Extract"] = TextExtractHotkeyInput
+        ["QR"] = QrHotkeyInput, ["Text Extract"] = TextExtractHotkeyInput, ["Translate"] = TranslateHotkeyInput
     };
 
     private void UpdateHotkeyLabels()
@@ -1411,9 +1634,10 @@ public sealed partial class MainWindow : Window
         RegisterActiveHotkeys();
     }
 
-    private static List<HotkeyRegistration> BuildHotkeyRegistrations(Dictionary<string, HotkeyGesture> hotkeys) =>
-        new[] { "Typing", "Screenshot", "Share", "QR", "Text Extract" }
-            .Select((action, index) => new HotkeyRegistration(GlobalHotkeyId + index, action, hotkeys[action])).ToList();
+    private List<HotkeyRegistration> BuildHotkeyRegistrations(Dictionary<string, HotkeyGesture> hotkeys, bool? translationConfigured = null) =>
+        new[] { "Typing", "Screenshot", "Share", "QR", "Text Extract", "Translate" }
+            .Select((action, index) => new HotkeyRegistration(GlobalHotkeyId + index, action, hotkeys[action]))
+            .Where(binding => binding.Action != "Translate" || (translationConfigured ?? _translationSettings.IsConfigured)).ToList();
 
     private void RegisterActiveHotkeys()
     {
@@ -1435,6 +1659,9 @@ public sealed partial class MainWindow : Window
             : $"Instant share ({Shortcut("Share", 2)}) — shared screenshots are saved for 14 days.");
         ToolTipService.SetToolTip(QrToolButton, $"Scan QR code ({Shortcut("QR", 3)})");
         ToolTipService.SetToolTip(TextExtractToolButton, $"Extract English text ({Shortcut("Text Extract", 4)})");
+        ToolTipService.SetToolTip(TranslateButton, !_translationSettings.IsConfigured
+            ? "Translate clipboard text — configure Microsoft Translator in Settings → Translation"
+            : $"Translate clipboard text into {_translationSettings.TargetLanguage} ({Shortcut("Translate", 5)}) with Microsoft Translator");
     }
 
     private static bool IsModifierKey(VirtualKey key)
@@ -1526,10 +1753,15 @@ public sealed partial class MainWindow : Window
             if (action == 0) StartPauseButton_Click(this, new RoutedEventArgs());
             else if (!_isRunning && !_isReadingClipboard && !_isSelectingRegion && !_isClosing)
             {
+                if (action == 5 && _translationSettings.IsConfigured)
+                {
+                    ActivateExistingWindow();
+                    TranslateButton_Click(TranslateButton, new RoutedEventArgs());
+                }
                 Button? tool = action switch { 1 => ScreenshotToolButton, 2 => ShareToolButton, 3 => QrToolButton, 4 => TextExtractToolButton, _ => null };
                 if (tool is not null) RegionButton_Click(tool, new RoutedEventArgs());
             }
-            if (action is >= 0 and <= 4) return IntPtr.Zero;
+            if (action is >= 0 and <= 5) return IntPtr.Zero;
         }
 
         return DefSubclassProc(hWnd, message, wParam, lParam);
@@ -1541,6 +1773,7 @@ public sealed partial class MainWindow : Window
         _trayIcon?.Dispose();
         _trayIcon = null;
         _sharingCompletion?.TrySetResult(null);
+        _translationCancellation?.Cancel();
         _shareCancellation?.Cancel();
         _ocrCancellation?.Cancel();
         _screenshotClipboardStream?.Dispose();

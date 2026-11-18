@@ -1,5 +1,5 @@
 // Optional metadata enhancement; direct download links work without JavaScript.
-fetch('https://api.github.com/repos/santa512/AutoTyper/releases/tags/v0.2', {
+fetch('https://api.github.com/repos/santa512/AutoTyper/releases/tags/v0.2.1', {
   headers: { Accept: 'application/vnd.github+json' }
 }).then(response => response.ok ? response.json() : null).then(release => {
   for (const filename of ['AutoTyper.exe', 'AutoTyperCompact.exe']) {

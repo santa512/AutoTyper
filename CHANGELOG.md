@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1 — 2026-11-18
+
+- Add a configurable global clipboard translation hotkey (Ctrl+Shift+T by default), active after Microsoft Translator setup, with conflict-safe preference migration.
+- Match the language selector and translate button heights and remove the blank gap after Hotkeys.
+- Add password-encrypted settings export/import, including API keys and all hotkeys, with review before applying an import.
+- Add Microsoft Translator clipboard translation with an English-default target-language dropdown, original and translated text together in the input, an encrypted API key setting, optional clipboard output and cancellation.
+
 ## 0.2 — 2026-11-18
 
 ### Both editions
