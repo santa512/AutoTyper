@@ -10,7 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Windows.System;
 
-namespace TypingPractice;
+namespace AutoTyper;
 
 public sealed partial class MainWindow : Window
 {
@@ -712,7 +712,7 @@ public sealed partial class MainWindow : Window
             Microsoft.UI.Windowing.AppWindow.GetFromWindowId(
                 Microsoft.UI.Win32Interop.GetWindowIdFromWindow(_windowHandle));
         appWindow.Resize(new Windows.Graphics.SizeInt32(1000, 800));
-        appWindow.SetIcon(System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "TypingPractice.ico"));
+        appWindow.SetIcon(System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "AutoTyper.ico"));
 
         if (!SetWindowSubclass(
                 _windowHandle,

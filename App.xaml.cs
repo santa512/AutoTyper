@@ -1,6 +1,6 @@
 using Microsoft.UI.Xaml;
 
-namespace TypingPractice;
+namespace AutoTyper;
 
 public partial class App : Application
 {

@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace TypingPractice;
+namespace AutoTyper;
 
 internal static class NativeKeyboard
 {

@@ -1,15 +1,15 @@
-# Typing Practice
+# Auto Typer
 
 **Version 0.1** · Windows desktop · x64 · Initial release
 
 A small Windows app that types your text into another application with an adjustable, natural rhythm. It supports punctuation pauses, occasional adjacent-key mistakes, and delayed corrections using the arrow keys and Backspace.
 
-**[Download TypingPractice.exe](https://github.com/santa512/TypingPractice/releases/download/v0.1/TypingPractice.exe)** · **[Download page](https://santa512.github.io/TypingPractice/)** · **[Release history](https://github.com/santa512/TypingPractice/releases)**
+**[Download AutoTyper.exe](https://github.com/santa512/AutoTyper/releases/download/v0.1/AutoTyper.exe)** · **[Download page](https://santa512.github.io/AutoTyper/)** · **[Release history](https://github.com/santa512/AutoTyper/releases)**
 
 ## Download and launch
 
-1. Download `TypingPractice.exe` from the link above or the repository's **Releases** page.
-2. Keep its filename as `TypingPractice.exe` and double-click it.
+1. Download `AutoTyper.exe` from the link above or the repository's **Releases** page.
+2. Keep its filename as `AutoTyper.exe` and double-click it.
 3. No installer or separate .NET / Windows App SDK runtime installation is required. Dependencies unpack automatically into a local cache on first launch.
 
 The self-contained download is approximately **92 MB** because it includes both runtimes. The extracted runtime uses additional disk space. You only need to distribute the single EXE; do not download GitHub's source ZIP to run the app.
@@ -22,10 +22,10 @@ The self-contained download is approximately **92 MB** because it includes both 
 
 ### Verify the download
 
-The release includes `TypingPractice.exe.sha256`. To calculate the EXE's SHA-256 checksum:
+The release includes `AutoTyper.exe.sha256`. To calculate the EXE's SHA-256 checksum:
 
 ```powershell
-Get-FileHash .\TypingPractice.exe -Algorithm SHA256
+Get-FileHash .\AutoTyper.exe -Algorithm SHA256
 ```
 
 Compare the result with the hash in the accompanying checksum file.
@@ -36,7 +36,7 @@ Compare the result with the hash in the accompanying checksum file.
 2. Adjust the pace, rhythm, mistake chance, and ready delay if needed.
 3. Press **Start**, then click the destination text field during the ready countdown. Alternatively, leave the destination focused and press **Ctrl+Shift+Space**.
 4. Release the hotkey modifiers. Typing begins after the countdown.
-5. Use the global hotkey to **pause or resume** without switching back to Typing Practice.
+5. Use the global hotkey to **pause or resume** without switching back to Auto Typer.
 
 The input text stays read-only during a run. The current character is highlighted even while the destination app has focus; during corrections, the highlight returns to the character being fixed. A small circular indicator, character count, and status sit on the same row as the delay and hotkey controls. Hover over status for activity details.
 
@@ -78,7 +78,7 @@ The app does not read text from the destination, record your physical typing, or
 | Nothing is being typed | Release Ctrl/Alt/Shift/Windows; confirm the destination accepts simulated input and does not run with higher privileges. |
 | The hotkey does not work | Hover over the pencil for registration feedback and choose a different combination. |
 | Corrections land in the wrong place | Use a plain text field and avoid moving the caret, changing selection, or enabling automatic editor transformations. |
-| The app fails after renaming the EXE | Restore the filename `TypingPractice.exe`; WinUI uses it to resolve application resources. |
+| The app fails after renaming the EXE | Restore the filename `AutoTyper.exe`; WinUI uses it to resolve application resources. |
 | First launch takes longer | The single-file build extracts its bundled runtimes on first launch. |
 
 ## Build from source
@@ -86,19 +86,19 @@ The app does not read text from the destination, record your physical typing, or
 Use Windows with the **.NET 10 SDK** and the Windows tooling required by WinUI 3 / Windows App SDK. The project references `Microsoft.WindowsAppSDK` 2.7.0. The release workflow uses a Windows runner with the .NET 10 SDK.
 
 ```powershell
-git clone https://github.com/santa512/TypingPractice.git
-cd TypingPractice
-dotnet build TypingPractice.csproj -p:Platform=x64
+git clone https://github.com/santa512/AutoTyper.git
+cd AutoTyper
+dotnet build AutoTyper.csproj -p:Platform=x64
 ```
 
 ### Build the single-file release
 
 ```powershell
-dotnet publish TypingPractice.csproj -p:PublishProfile=SingleFile-x64 -c Release -p:Platform=x64
-Copy-Item dist\SingleFile-win-x64\TypingPractice.exe dist\TypingPractice.exe
+dotnet publish AutoTyper.csproj -p:PublishProfile=SingleFile-x64 -c Release -p:Platform=x64
+Copy-Item dist\SingleFile-win-x64\AutoTyper.exe dist\AutoTyper.exe
 ```
 
-Run `dist\TypingPractice.exe`. The profile bundles .NET and the Windows App SDK, compresses the payload, and extracts its content at launch. Trimming is disabled for WinUI compatibility.
+Run `dist\AutoTyper.exe`. The profile bundles .NET and the Windows App SDK, compresses the payload, and extracts its content at launch. Trimming is disabled for WinUI compatibility.
 
 For a folder-based build, use `-p:PublishProfile=Portable-x64` instead. Keep every file in that publish folder together.
 
@@ -109,7 +109,7 @@ For a folder-based build, use `-p:PublishProfile=Portable-x64` instead. Keep eve
 | `MainWindow.xaml` | Window layout, input controls, compact status, and theme resources. |
 | `MainWindow.xaml.cs` | Typing rhythm, corrections, progress, global hotkey, title-bar colors, and pin behavior. |
 | `NativeKeyboard.cs` | Native keyboard input interop. |
-| `Assets/TypingPractice.ico` | App and executable icon. |
+| `Assets/AutoTyper.ico` | App and executable icon. |
 | `scripts/New-AppIcon.ps1` | Recreates the multi-resolution icon. |
 | `Properties/PublishProfiles/` | Single-file and folder-based release profiles. |
 | `docs/` | Static GitHub Pages download site. |
@@ -120,7 +120,7 @@ Build outputs, downloaded tooling, and local editor settings are excluded from G
 
 ## Publish a new version
 
-1. Update the version in `TypingPractice.csproj` and the visible badge in `MainWindow.xaml`.
+1. Update the version in `AutoTyper.csproj` and the visible badge in `MainWindow.xaml`.
 2. Update this README, the download page, and `CHANGELOG.md`.
 3. Add `release-notes/vX.Y.md`.
 4. Push a matching `vX.Y` tag. The release workflow builds the EXE, generates its checksum, and attaches both to the GitHub Release.
@@ -129,6 +129,6 @@ The Pages workflow deploys `docs/` when it changes on `main`. Configure **Settin
 
 ## Feedback
 
-[Open an issue](https://github.com/santa512/TypingPractice/issues) with the app version, Windows version, destination editor, and steps to reproduce. Use a short, non-sensitive sample of input text where necessary.
+[Open an issue](https://github.com/santa512/AutoTyper/issues) with the app version, Windows version, destination editor, and steps to reproduce. Use a short, non-sensitive sample of input text where necessary.
 
 See [CHANGELOG.md](CHANGELOG.md) for version history.

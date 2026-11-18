@@ -1,5 +1,5 @@
 Add-Type -AssemblyName System.Drawing
-$iconPath = Join-Path $PSScriptRoot '..\Assets\TypingPractice.ico'
+$iconPath = Join-Path $PSScriptRoot '..\Assets\AutoTyper.ico'
 [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($iconPath)) | Out-Null
 $images = @()
 foreach ($size in @(16, 32, 48, 64, 128, 256)) {

@@ -3,13 +3,13 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
-    <RootNamespace>TypingPractice</RootNamespace>
+    <RootNamespace>AutoTyper</RootNamespace>
     <Version>0.1.0</Version>
     <InformationalVersion>0.1</InformationalVersion>
-    <Product>Typing Practice</Product>
-    <Description>Typing practice with realistic rhythms and global keyboard output.</Description>
+    <Product>Auto Typer</Product>
+    <Description>Automatic typing with natural rhythm and global keyboard output.</Description>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon>Assets\TypingPractice.ico</ApplicationIcon>
+    <ApplicationIcon>Assets\AutoTyper.ico</ApplicationIcon>
     <Platforms>x64;x86;ARM64</Platforms>
     <RuntimeIdentifiers>win-x64;win-x86;win-arm64</RuntimeIdentifiers>
     <UseWinUI>true</UseWinUI>
@@ -20,7 +20,7 @@
     <DefaultItemExcludes>$(DefaultItemExcludes);dist\**;.tools\**</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup>
-    <Content Include="Assets\TypingPractice.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\AutoTyper.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.7.0" />
   </ItemGroup>
 </Project>
