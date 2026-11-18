@@ -4,15 +4,26 @@
 
 A small Windows app that types your text into another application with an adjustable, natural rhythm. It supports punctuation pauses, occasional adjacent-key mistakes, and delayed corrections using the arrow keys and Backspace.
 
-**[Download AutoTyper.exe](https://github.com/santa512/AutoTyper/releases/download/v0.1/AutoTyper.exe)** · **[Download page](https://santa512.github.io/AutoTyper/)** · **[Release history](https://github.com/santa512/AutoTyper/releases)**
+**[Choose an edition](https://santa512.github.io/AutoTyper/#downloads)** · **[Release history](https://github.com/santa512/AutoTyper/releases)**
+
+## Choose your download
+
+Both editions are version 0.1 for Windows x64. Both support global typing, pause/resume, a ready countdown, typo corrections, current-character highlighting, and pin on top.
+
+| Edition | Download | Size | Main differences |
+| --- | --- | --- | --- |
+| **Compact — native C++ / Win32** | [AutoTyperCompact.exe](https://github.com/santa512/AutoTyper/releases/download/v0.1/AutoTyperCompact.exe) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.1/AutoTyperCompact.exe.sha256) | Under 1 MB; varies by compiler | Smaller window, no bundled runtime or extraction. Ctrl/Alt/Shift hotkeys and whole-percent mistake settings. |
+| **WinUI — modern Windows UI** | [AutoTyper.exe](https://github.com/santa512/AutoTyper/releases/download/v0.1/AutoTyper.exe) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.1/AutoTyper.exe.sha256) | About 92 MB | Modern Windows controls, bundled runtimes, Windows-key hotkeys, and finer mistake adjustments. |
+
+Run one edition at a time so they do not compete for the same global hotkey. The guide below describes the WinUI edition; see the [Compact guide](native/README.md) for native build and usage details.
 
 ## Download and launch
 
-1. Download `AutoTyper.exe` from the link above or the repository's **Releases** page.
-2. Keep its filename as `AutoTyper.exe` and double-click it.
-3. No installer or separate .NET / Windows App SDK runtime installation is required. Dependencies unpack automatically into a local cache on first launch.
+1. Download your chosen edition from the table above or the repository's **Releases** page.
+2. Double-click `AutoTyperCompact.exe` or `AutoTyper.exe`.
+3. Neither edition needs an installer. Compact uses Windows system components directly. WinUI bundles its .NET / Windows App SDK dependencies and unpacks them into a local cache on first launch; keep its filename as `AutoTyper.exe`.
 
-The self-contained download is approximately **92 MB** because it includes both runtimes. The extracted runtime uses additional disk space. You only need to distribute the single EXE; do not download GitHub's source ZIP to run the app.
+The WinUI download is approximately **92 MB** because it includes both runtimes; the extracted runtime uses additional disk space. Compact is **under 1 MB**. You only need your chosen EXE; do not download GitHub's source ZIP to run the app.
 
 ### Requirements
 
@@ -22,10 +33,12 @@ The self-contained download is approximately **92 MB** because it includes both 
 
 ### Verify the download
 
-The release includes `AutoTyper.exe.sha256`. To calculate the EXE's SHA-256 checksum:
+The release includes a matching `.sha256` file for each executable. Calculate your chosen EXE's checksum:
 
 ```powershell
 Get-FileHash .\AutoTyper.exe -Algorithm SHA256
+# Or, for Compact:
+Get-FileHash .\AutoTyperCompact.exe -Algorithm SHA256
 ```
 
 Compare the result with the hash in the accompanying checksum file.
@@ -83,6 +96,12 @@ The app does not read text from the destination, record your physical typing, or
 
 ## Build from source
 
+### Compact C++ / Win32 edition
+
+A separate native implementation is available in [`native/`](native/README.md). It has a smaller window and produces an approximately **368 KB** standalone executable without .NET or the Windows App SDK. The original WinUI edition remains available independently.
+
+### WinUI edition
+
 Use Windows with the **.NET 10 SDK** and the Windows tooling required by WinUI 3 / Windows App SDK. The project references `Microsoft.WindowsAppSDK` 2.7.0. The release workflow uses a Windows runner with the .NET 10 SDK.
 
 ```powershell
@@ -123,7 +142,7 @@ Build outputs, downloaded tooling, and local editor settings are excluded from G
 1. Update the version in `AutoTyper.csproj` and the visible badge in `MainWindow.xaml`.
 2. Update this README, the download page, and `CHANGELOG.md`.
 3. Add `release-notes/vX.Y.md`.
-4. Push a matching `vX.Y` tag. The release workflow builds the EXE, generates its checksum, and attaches both to the GitHub Release.
+4. Push a matching `vX.Y` tag. The release workflow builds both editions, runs the compact engine tests, generates checksums, and uploads all four files. A manual workflow run can publish only `compact` or `winui` while retaining the other edition's assets.
 
 The Pages workflow deploys `docs/` when it changes on `main`. Configure **Settings → Pages → Source → GitHub Actions** for the repository.
 

@@ -9,6 +9,11 @@ on:
         description: Existing release tag (for example v0.1)
         required: true
         default: v0.1
+      edition:
+        description: Edition to build and publish
+        type: choice
+        options: [both, winui, compact]
+        default: both
 
 permissions:
   contents: write
@@ -18,22 +23,41 @@ jobs:
     runs-on: windows-2025
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      BUILD_EDITION: ${{ inputs.edition || 'both' }}
     steps:
       - uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || env.RELEASE_TAG }}
       - uses: actions/setup-dotnet@v5
+        if: env.BUILD_EDITION != 'compact'
         with:
           dotnet-version: '10.0.x'
       - name: Publish self-contained executable
+        if: env.BUILD_EDITION != 'compact'
         shell: pwsh
         run: dotnet publish AutoTyper.csproj -p:PublishProfile=SingleFile-x64 -c Release -p:Platform=x64
+      - name: Build and test compact edition
+        if: env.BUILD_EDITION != 'winui'
+        shell: pwsh
+        run: |
+          cmake -S native -B native/build -A x64 -DBUILD_TESTING=ON
+          if ($LASTEXITCODE -ne 0) { throw 'Compact configuration failed.' }
+          cmake --build native/build --config Release
+          if ($LASTEXITCODE -ne 0) { throw 'Compact build failed.' }
+          ctest --test-dir native/build -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) { throw 'Compact tests failed.' }
+          New-Item -ItemType Directory -Path native/dist -Force | Out-Null
+          Copy-Item native/build/Release/AutoTyperCompact.exe native/dist/AutoTyperCompact.exe
       - name: Checksum
         shell: pwsh
         run: |
-          $exe = 'dist/SingleFile-win-x64/AutoTyper.exe'
-          $hash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  AutoTyper.exe" | Set-Content -LiteralPath "$exe.sha256" -Encoding ascii
+          $executables = @()
+          if ($env:BUILD_EDITION -ne 'compact') { $executables += 'dist/SingleFile-win-x64/AutoTyper.exe' }
+          if ($env:BUILD_EDITION -ne 'winui') { $executables += 'native/dist/AutoTyperCompact.exe' }
+          foreach ($exe in $executables) {
+            $hash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $(Split-Path -Leaf $exe)" | Set-Content -LiteralPath "$exe.sha256" -Encoding ascii
+          }
       - name: Publish GitHub release
         shell: pwsh
         env:
@@ -50,5 +74,8 @@ jobs:
             gh release edit $env:RELEASE_TAG --title "Auto Typer $env:RELEASE_TAG" --notes-file $notesPath
             if ($LASTEXITCODE -ne 0) { throw 'Could not update release.' }
           }
-          gh release upload $env:RELEASE_TAG 'dist/SingleFile-win-x64/AutoTyper.exe' 'dist/SingleFile-win-x64/AutoTyper.exe.sha256' --clobber
+          $assets = @()
+          if ($env:BUILD_EDITION -ne 'compact') { $assets += 'dist/SingleFile-win-x64/AutoTyper.exe', 'dist/SingleFile-win-x64/AutoTyper.exe.sha256' }
+          if ($env:BUILD_EDITION -ne 'winui') { $assets += 'native/dist/AutoTyperCompact.exe', 'native/dist/AutoTyperCompact.exe.sha256' }
+          gh release upload $env:RELEASE_TAG @assets --clobber
           if ($LASTEXITCODE -ne 0) { throw 'Could not upload release assets.' }
