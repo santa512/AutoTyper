@@ -15,6 +15,12 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        if (Environment.GetCommandLineArgs().Contains("--caption-self-test"))
+        {
+            try { CaptionSpeechRuntime.EnsureAvailable(); Environment.ExitCode=0; }
+            catch { Environment.ExitCode=1; }
+            Exit(); return;
+        }
         if (Environment.GetCommandLineArgs().Contains("--audio-self-test"))
         {
             try

@@ -12,11 +12,13 @@
     <ApplicationDefinition Include="../../App.xaml" Link="App.xaml" />
     <Page Include="../../MainWindow.xaml" Link="MainWindow.xaml" />
     <Page Include="../../TrayMenuWindow.xaml" Link="TrayMenuWindow.xaml" />
+    <Page Include="../../CaptionWindow.xaml" Link="CaptionWindow.xaml" />
     <Content Include="../../Assets/AutoTyper.ico" Link="Assets/AutoTyper.ico" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../../audio/native/bin/x64/AutoTyperAudio.dll" Link="AutoTyperAudio.dll" CopyToOutputDirectory="PreserveNewest" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.7.0" />
     <PackageReference Include="ZXing.Net" Version="0.16.11" />
     <PackageReference Include="RapidOcrNet" Version="4.2.0" ExcludeAssets="build" />
     <PackageReference Include="NAudio.Wasapi" Version="3.3.0" />
+    <PackageReference Include="Vosk" Version="0.3.38" />
   </ItemGroup>
 </Project>

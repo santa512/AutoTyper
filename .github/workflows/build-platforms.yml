@@ -38,7 +38,7 @@ jobs:
         if: inputs.edition != 'compact'
         shell: pwsh
         run: |
-          foreach ($project in @('QrDecoder.Tests', 'Screenshot.Tests', 'Ocr.Tests', 'Sharing.Tests', 'SingleInstance.Tests', 'Translation.Tests', 'Audio.Tests')) {
+          foreach ($project in @('QrDecoder.Tests', 'Screenshot.Tests', 'Ocr.Tests', 'Sharing.Tests', 'SingleInstance.Tests', 'Translation.Tests', 'Audio.Tests', 'Captions.Tests', 'Summary.Tests')) {
             dotnet run --project "tests/$project" -c Release -r 'win-${{ matrix.arch }}'
             if ($LASTEXITCODE -ne 0) { throw "$project failed on ${{ matrix.arch }}." }
           }

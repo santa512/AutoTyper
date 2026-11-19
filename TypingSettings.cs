@@ -10,6 +10,9 @@ internal sealed record TypingSettings
     public double DelaySeconds { get; init; } = 3;
     public bool MinimizeToTray { get; init; }
     public bool RunOnStartup { get; init; }
+    public string Theme { get; init; } = "System";
+    public string TrayClickAction { get; init; } = "Main";
+    public string TrayDoubleClickAction { get; init; } = "Main";
     public uint HotkeyModifiers { get; init; } = 0x4006;
     public uint HotkeyKey { get; init; } = 0x20;
     public string HotkeyLabel { get; init; } = "Ctrl+Shift+Space";
@@ -27,6 +30,10 @@ internal sealed record TypingSettings
 
     internal void Validate()
     {
+        if (!GeneralPreferenceOptions.Themes.Contains(Theme)
+            || !GeneralPreferenceOptions.TrayActions.Any(action => action.Id == TrayClickAction)
+            || !GeneralPreferenceOptions.TrayActions.Any(action => action.Id == TrayDoubleClickAction))
+            throw new InvalidOperationException("Choose a valid theme and tray click actions.");
         if (!double.IsFinite(Pace) || Pace < 0.5 || Pace > 2 || !double.IsFinite(Rhythm) || Rhythm < 0 || Rhythm > 1
             || !double.IsFinite(MistakeChance) || MistakeChance < 0 || MistakeChance > 0.12
             || !double.IsFinite(DelaySeconds) || DelaySeconds < 0 || DelaySeconds > 10)
@@ -40,6 +47,23 @@ internal sealed record TypingSettings
         if (hotkeys.Select(h => (h.Modifiers & 0xf, h.Key)).Distinct().Count() != hotkeys.Length)
             throw new InvalidOperationException("Each action needs a different hotkey.");
     }
+}
+
+internal sealed record TrayActionChoice(string Id, string Label)
+{
+    public override string ToString() => Label;
+}
+
+internal static class GeneralPreferenceOptions
+{
+    internal static readonly string[] Themes = ["System", "Dark", "Light"];
+    internal static readonly TrayActionChoice[] TrayActions =
+    [
+        new("Main", "Open main window"), new("Menu", "Show tray menu"), new("Captions", "Live captions"),
+        new("Typing", "Start / pause typing"), new("Screenshot", "Screenshot"), new("Share", "Instant share"),
+        new("QR", "Scan QR code"), new("Text Extract", "Text extract"), new("Translate", "Translate clipboard"),
+        new("Settings", "Settings"), new("None", "Do nothing")
+    ];
 }
 
 internal static class TypingSettingsStore

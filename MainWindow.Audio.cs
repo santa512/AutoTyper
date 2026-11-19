@@ -48,12 +48,12 @@ public sealed partial class MainWindow
             AudioHeadphones.SelectedItem=devices.Outputs.Find(device=>device.Id==output)
                 ??devices.Outputs.Find(device=>device.Name.Contains("headphone",StringComparison.OrdinalIgnoreCase)
                     ||device.Name.Contains("headset",StringComparison.OrdinalIgnoreCase))??devices.Outputs.FirstOrDefault();
-            AudioStatus.Text=devices.Inputs.Count==0?"No microphone found. Connect a mic and refresh."
-                :devices.Outputs.Count==0?"No output device found. Connect headphones and refresh.":"Ready for headphone preview";
+            SetAudioStatus(devices.Inputs.Count==0?"No microphone found. Connect a mic and refresh."
+                :devices.Outputs.Count==0?"No output device found. Connect headphones and refresh.":"");
         }
         catch(Exception e) when(e is COMException or InvalidOperationException or UnauthorizedAccessException)
         {
-            if(!_isClosing) AudioStatus.Text="Audio devices are unavailable. Check Windows audio settings and refresh.";
+            if(!_isClosing) SetAudioStatus("Audio devices are unavailable. Check Windows audio settings and refresh.");
         }
         finally
         {
@@ -79,7 +79,6 @@ public sealed partial class MainWindow
     {
         if(!_audioReady) return;
         _audioPreview?.Configure(CaptureAudioSettings(),AudioOriginalToggle.IsOn);
-        if(_audioPreview is not null) AudioStatus.Text=AudioOriginalToggle.IsOn?"Previewing original voice":"Previewing thicker voice";
         UpdateAudioPreviewAppearance(_audioPreview is not null,_audioStarting);
     }
     private void UpdateAudioLabels()
@@ -87,6 +86,11 @@ public sealed partial class MainWindow
         AudioDepthValue.Text=$"−{AudioDepthSlider.Value:0.0} semitones";
         AudioBodyValue.Text=$"{AudioBodySlider.Value:0}%";
         AudioVolumeValue.Text=$"{AudioVolumeSlider.Value:0}%";
+    }
+    private void SetAudioStatus(string message)
+    {
+        AudioStatus.Text=message;
+        AudioStatus.Visibility=string.IsNullOrEmpty(message)?Visibility.Collapsed:Visibility.Visible;
     }
     private void UpdateAudioControls()
     {
@@ -101,11 +105,7 @@ public sealed partial class MainWindow
         AudioStartIcon.Glyph=active?"\uE71A":"\uE768";
         AudioStartButton.Style=(Style)Application.Current.Resources[active?"DefaultButtonStyle":"AccentButtonStyle"];
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(AudioStartButton,AudioStartLabel.Text);
-        AudioStateText.Text=starting?"Starting preview…":active
-            ?(AudioOriginalToggle.IsOn?"Live · Original":"Live · Processed"):"Preview off";
-        AudioStateDot.Fill=new SolidColorBrush(active&&!starting
-            ?Windows.UI.Color.FromArgb(255,60,180,110):Windows.UI.Color.FromArgb(255,140,140,140));
-        if(active) AudioPanel.BorderBrush=AudioStateDot.Fill;
+        if(active) AudioPanel.BorderBrush=new SolidColorBrush(Windows.UI.Color.FromArgb(255,60,180,110));
         else AudioPanel.ClearValue(Border.BorderBrushProperty);
         ToolTipService.SetToolTip(AudioStartButton,active
             ?"Stop Auto Typer's audio output. Audio playing in other apps continues."
@@ -117,7 +117,7 @@ public sealed partial class MainWindow
         if(_audioStarting || _isClosing) return;
         _audioStarting=true;
         UpdateAudioControls();
-        AudioStatus.Text="Starting local preview…";
+        SetAudioStatus("");
         await Task.Yield();
         try
         {
@@ -130,11 +130,11 @@ public sealed partial class MainWindow
             {
                 if(!ReferenceEquals(_audioPreview,preview)) return;
                 StopAudioPreview();
-                if(!_isClosing) AudioStatus.Text="An audio device stopped. Check its connection and refresh.";
+                if(!_isClosing) SetAudioStatus("An audio device stopped. Check its connection and refresh.");
             });
             preview.Start();
             _audioMeterTimer!.Start();
-            AudioStatus.Text=AudioOriginalToggle.IsOn?"Previewing original voice":"Previewing thicker voice";
+            SetAudioStatus("");
             AudioLatency.Text=$"Estimated stream delay: {preview.DelayMilliseconds:0} ms";
             AudioLatency.Visibility=Visibility.Visible;
         }
@@ -142,10 +142,10 @@ public sealed partial class MainWindow
             or DllNotFoundException or BadImageFormatException or System.IO.IOException)
         {
             StopAudioPreview(save:false);
-            AudioStatus.Text=exception is DllNotFoundException or BadImageFormatException
+            SetAudioStatus(exception is DllNotFoundException or BadImageFormatException
                 ?"The local audio files are unavailable. Use the complete latest EXE."
                 :exception is UnauthorizedAccessException?"Allow desktop microphone access in Windows settings."
-                :"Could not start preview. Check microphone access and whether the selected devices are available.";
+                :"Could not start preview. Check microphone access and whether the selected devices are available.");
         }
         finally { _audioStarting=false; if(!_isClosing) UpdateAudioControls(); }
     }
@@ -162,7 +162,7 @@ public sealed partial class MainWindow
             catch(Exception e) when(e is System.IO.IOException or UnauthorizedAccessException) { System.Diagnostics.Debug.WriteLine(e); }
         }
         if(_isClosing) return;
-        AudioStatus.Text="Preview stopped";
+        SetAudioStatus("");
         AudioLatency.Text=""; AudioLatency.Visibility=Visibility.Collapsed; AudioInputMeter.Value=AudioOutputMeter.Value=0;
         UpdateAudioControls();
     }

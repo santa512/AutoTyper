@@ -5,13 +5,18 @@ namespace AutoTyper;
 
 internal sealed record TrayCommand(string Id, string Title, string Glyph, string? Hotkey = null, bool Enabled = true, bool SeparatorBefore = false);
 
-internal sealed class TrayIcon(IntPtr window, Func<IReadOnlyList<TrayCommand>> menuItems, Action<string> invoke, Func<ElementTheme> theme) : IDisposable
+internal sealed class TrayIcon(IntPtr window, Func<IReadOnlyList<TrayCommand>> menuItems, Action<string> invoke,
+    Func<ElementTheme> theme, Func<(string Single, string Double)> clickActions) : IDisposable
 {
     internal const uint CallbackMessage = 0x8052;
     internal static uint TaskbarCreatedMessage { get; } = RegisterWindowMessage("TaskbarCreated");
     private IntPtr _icon;
     private bool _disposed;
     private TrayMenuWindow? _menuWindow;
+    private readonly TrayClickTracker _clicks = new();
+    private DispatcherTimer? _singleClickTimer;
+    private bool _version4;
+    private int _clickX, _clickY;
     internal bool IsVisible { get; private set; }
 
     internal bool Show()
@@ -23,7 +28,7 @@ internal sealed class TrayIcon(IntPtr window, Func<IReadOnlyList<TrayCommand>> m
         if (_icon == IntPtr.Zero) return false;
         var data = Data();
         IsVisible = Shell_NotifyIcon(0, ref data);
-        if (IsVisible) { data.Version = 4; Shell_NotifyIcon(4, ref data); }
+        if (IsVisible) { data.Version = 4; _version4 = Shell_NotifyIcon(4, ref data); }
         return IsVisible;
     }
 
@@ -37,15 +42,52 @@ internal sealed class TrayIcon(IntPtr window, Func<IReadOnlyList<TrayCommand>> m
         }
         if (message != CallbackMessage) return false;
         uint notification = (uint)(lParam.ToInt64() & 0xffff);
-        if (notification is 0x400 or 0x401 or 0x203) { _menuWindow?.CloseMenu(); invoke("Main"); }
+        int x = unchecked((short)(wParam.ToInt64() & 0xffff));
+        int y = unchecked((short)((wParam.ToInt64() >> 16) & 0xffff));
+        if (!_version4 || (x == -1 && y == -1)) { GetCursorPos(out var point); x = point.X; y = point.Y; }
+        if (notification == 0x201) _clicks.ButtonDown();
+        else if (notification == 0x203)
+        {
+            _singleClickTimer?.Stop(); _clicks.DoubleClick();
+            InvokeClick(clickActions().Double, x, y);
+        }
+        else if (notification == 0x401)
+        {
+            CancelPendingClick(); InvokeClick(clickActions().Single, x, y);
+        }
+        else if (notification == 0x400 || (!_version4 && notification == 0x202))
+        {
+            if (_clicks.Select())
+            {
+                _clickX = x; _clickY = y;
+                if (_singleClickTimer is null)
+                {
+                    _singleClickTimer = new DispatcherTimer();
+                    _singleClickTimer.Tick += (_, _) =>
+                    {
+                        _singleClickTimer.Stop();
+                        if (!_disposed && _clicks.TakeSingle()) InvokeClick(clickActions().Single, _clickX, _clickY);
+                    };
+                }
+                _singleClickTimer.Stop();
+                _singleClickTimer.Interval = TimeSpan.FromMilliseconds(Math.Max(1u, GetDoubleClickTime()));
+                _singleClickTimer.Start();
+            }
+        }
         else if (notification is 0x7b or 0x205)
         {
-            int x = unchecked((short)(wParam.ToInt64() & 0xffff));
-            int y = unchecked((short)((wParam.ToInt64() >> 16) & 0xffff));
-            if (x == -1 && y == -1) { GetCursorPos(out var point); x = point.X; y = point.Y; }
+            CancelPendingClick();
             ShowMenu(x, y);
         }
         return true;
+    }
+
+    internal void CancelPendingClick() { _singleClickTimer?.Stop(); _clicks.Cancel(); }
+    private void InvokeClick(string action, int x, int y)
+    {
+        if (_disposed || action == "None") return;
+        if (action == "Menu") ShowMenu(x, y);
+        else { _menuWindow?.CloseMenu(); invoke(action); }
     }
 
     private void ShowMenu(int x, int y)
@@ -68,6 +110,7 @@ internal sealed class TrayIcon(IntPtr window, Func<IReadOnlyList<TrayCommand>> m
     {
         if (_disposed) return;
         _disposed = true;
+        CancelPendingClick();
         _menuWindow?.CloseMenu();
         _menuWindow = null;
         var data = Data();
@@ -93,4 +136,5 @@ internal sealed class TrayIcon(IntPtr window, Func<IReadOnlyList<TrayCommand>> m
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern IntPtr LoadImage(IntPtr instance, string path, uint type, int width, int height, uint flags);
     [DllImport("user32.dll")] private static extern bool DestroyIcon(IntPtr icon);
     [DllImport("user32.dll")] private static extern bool GetCursorPos(out Point point);
+    [DllImport("user32.dll")] private static extern uint GetDoubleClickTime();
 }

@@ -1,0 +1,14 @@
+Local English captions use Vosk API 0.3.38 (Alpha Cephei Inc, Apache-2.0).
+https://github.com/alphacep/vosk-api
+
+The optional vosk-model-small-en-us-0.15 model is downloaded from the
+official Vosk model repository and is distributed under Apache-2.0.
+https://alphacephei.com/vosk/models
+
+The Vosk Windows package also supplies libgcc_s_seh-1.dll and libstdc++-6.dll
+(GNU GCC runtime libraries, GPL-3.0 with GCC Runtime Library Exception 3.1)
+and libwinpthread-1.dll (mingw-w64 winpthreads, permissive licenses).
+The accompanying license texts apply to those dependencies.
+
+Audio is processed locally. Microsoft Translator receives only caption text
+when the user explicitly clicks Translate; its existing API settings apply.

@@ -85,6 +85,7 @@ public sealed partial class MainWindow : Window
     private bool _minimizeToTray;
     private bool _isInTray;
     private bool _exitRequested;
+    private readonly bool _persistPreferences;
     private static readonly HttpClient ShareHttpClient = ScreenshotShareClient.CreateHttpClient();
     private static readonly HttpClient TranslationHttpClient = MicrosoftTranslator.CreateHttpClient();
     internal ScreenRegion? SelectedRegion { get; private set; }
@@ -99,6 +100,7 @@ public sealed partial class MainWindow : Window
         SharingSettingsButton.IsEnabled = enabled;
         TranslationLanguage.IsEnabled = enabled;
         TranslateButton.IsEnabled = enabled && _translationSettings.IsConfigured;
+        UpdateSummaryButton();
     }
 
     private async void RegionButton_Click(object sender, RoutedEventArgs e)
@@ -342,6 +344,9 @@ public sealed partial class MainWindow : Window
     {
         _typingBeforeSettings = CaptureTypingSettings();
         _translationBeforeSettings = _translationSettings;
+        _summaryBeforeSettings = _summarySettings;
+        GroqApiKey.Password = _summarySettings.ApiKey;
+        GroqSecondaryKey.Password = _summarySettings.SecondaryApiKey;
         _translationDraftLanguage = _translationSettings.TargetLanguage;
         BackupPassword.Password = BackupStatusText.Text = "";
         TranslationApiKey.Password = _translationSettings.ApiKey;
@@ -352,7 +357,7 @@ public sealed partial class MainWindow : Window
         HotkeyStatusText.Text = "Shortcuts pause while Settings is open. Save to apply changes.";
         _settingsSaved = false;
         _sharingRequired = requireSharing;
-        SharingSettings current = _sharingSettings ?? SharingSettingsStore.Load() ?? new SharingSettings();
+        SharingSettings current = _sharingSettings ?? (_persistPreferences ? SharingSettingsStore.Load() : null) ?? new SharingSettings();
         SharingAccount.Text = current.AccountId;
         SharingBucket.Text = current.BucketName;
         SharingAccessKey.Password = current.AccessKeyId;
@@ -367,9 +372,11 @@ public sealed partial class MainWindow : Window
         SharingPanel.Visibility = Visibility.Visible;
         RecordHotkeyButton.IsEnabled = _windowSubclassed;
         SettingsScroller.UpdateLayout();
-        ScrollToSettingsSection(initialSection ?? (requireSharing ? "Cloud" : "Typing"));
+        UpdateSettingsEndPadding();
+        SettingsScroller.UpdateLayout();
+        ScrollToSettingsSection(initialSection ?? (requireSharing ? "Cloud" : "General"));
         if (requireSharing) SharingAccount.Focus(FocusState.Programmatic);
-        else TypingSettingsTab.Focus(FocusState.Programmatic);
+        else GeneralSettingsTab.Focus(FocusState.Programmatic);
         try { return await _sharingCompletion.Task; }
         finally
         {
@@ -381,8 +388,11 @@ public sealed partial class MainWindow : Window
             MainContent.Visibility = Visibility.Visible;
             SharingAccessKey.Password = SharingSecretKey.Password = "";
             TranslationApiKey.Password = "";
+            GroqApiKey.Password = "";
+            GroqSecondaryKey.Password = "";
             BackupPassword.Password = "";
             _translationBeforeSettings = null;
+            _summaryBeforeSettings = null;
             _cloudBeforeSettings = [];
             _sharingCompletion = null;
         }
@@ -399,6 +409,7 @@ public sealed partial class MainWindow : Window
     {
         bool changed = CaptureTypingSettings(useDraft: true) != _typingBeforeSettings
             || CaptureTranslationSettings() != _translationBeforeSettings
+            || CaptureSummarySettings() != _summaryBeforeSettings
             || !CaptureCloudSettingsValues().SequenceEqual(_cloudBeforeSettings);
         if (changed) UnsavedChangesPrompt.Visibility = Visibility.Visible;
         else _sharingCompletion?.TrySetResult(null);
@@ -424,16 +435,24 @@ public sealed partial class MainWindow : Window
             typing.Validate();
             TranslationSettings translation = CaptureTranslationSettings();
             translation.Validate(requireKey: false);
+            SummarySettings summary = CaptureSummarySettings();
+            summary.Validate(requireKey: false);
             bool hasCloudSettings = new[] { settings.AccountId, settings.BucketName, settings.AccessKeyId, settings.SecretAccessKey }
                 .Any(value => !string.IsNullOrWhiteSpace(value));
             if (hasCloudSettings || _sharingRequired) settings.Validate();
             if (_windowSubclassed && _globalHotkeys?.TryApply(BuildHotkeyRegistrations(typing.GetHotkeys(), translation.IsConfigured)) == false)
                 throw new InvalidOperationException($"Could not register {_globalHotkeys.FailedAction}. Choose another shortcut in Hotkeys; another app may be using it.");
-            StartupRegistration.Apply(typing.RunOnStartup);
-            if (hasCloudSettings || _sharingRequired) SharingSettingsStore.Save(settings);
-            else SharingSettingsStore.Clear();
-            TypingSettingsStore.Save(typing);
-            TranslationSettingsStore.Save(translation);
+            if (_persistPreferences)
+            {
+                StartupRegistration.Apply(typing.RunOnStartup);
+                if (hasCloudSettings || _sharingRequired) SharingSettingsStore.Save(settings);
+                else SharingSettingsStore.Clear();
+                TypingSettingsStore.Save(typing);
+                TranslationSettingsStore.Save(translation);
+                SummarySettingsStore.Save(summary);
+            }
+            _summarySettings = summary;
+            UpdateSummaryButton();
             _translationSettings = translation;
             TranslationLanguage.SelectedItem = translation.TargetLanguage;
             _sharingSettings = hasCloudSettings ? settings : null;
@@ -460,7 +479,7 @@ public sealed partial class MainWindow : Window
         };
         bool hasCloud = new[] { cloud.AccountId, cloud.BucketName, cloud.AccessKeyId, cloud.SecretAccessKey }
             .Any(value => !string.IsNullOrWhiteSpace(value));
-        var bundle = new SettingsBundle(CaptureTypingSettings(useDraft: true), hasCloud ? cloud : null, CaptureTranslationSettings());
+        var bundle = new SettingsBundle(CaptureTypingSettings(useDraft: true), hasCloud ? cloud : null, CaptureTranslationSettings(), CaptureSummarySettings());
         bundle.Validate();
         return bundle;
     }
@@ -519,8 +538,7 @@ public sealed partial class MainWindow : Window
             RhythmSlider.Value = typing.Rhythm;
             MistakeSlider.Value = typing.MistakeChance;
             ReadyDelayBox.Value = typing.DelaySeconds;
-            MinimizeToTrayToggle.IsOn = typing.MinimizeToTray;
-            RunOnStartupToggle.IsOn = typing.RunOnStartup;
+            ApplyGeneralDraft(typing);
             _draftHotkeys = typing.GetHotkeys();
             UpdateHotkeyLabels();
             var cloud = bundle.Sharing ?? new SharingSettings();
@@ -531,6 +549,8 @@ public sealed partial class MainWindow : Window
             SharingPublicUrl.Text = cloud.PublicBaseUrl;
             SharingJurisdiction.SelectedIndex = cloud.Jurisdiction switch { "eu" => 1, "us" => 2, "fedramp" => 3, _ => 0 };
             TranslationApiKey.Password = bundle.Translation.ApiKey;
+            GroqApiKey.Password = (bundle.Summary ?? new SummarySettings()).ApiKey;
+            GroqSecondaryKey.Password = (bundle.Summary ?? new SummarySettings()).SecondaryApiKey;
             TranslationRegion.Text = bundle.Translation.Region;
             _translationDraftLanguage = bundle.Translation.TargetLanguage;
             UnsavedChangesPrompt.Visibility = Visibility.Collapsed;
@@ -572,6 +592,9 @@ public sealed partial class MainWindow : Window
             Pace = PaceSlider.Value, Rhythm = RhythmSlider.Value, MistakeChance = MistakeSlider.Value,
             MinimizeToTray = MinimizeToTrayToggle.IsOn,
             RunOnStartup = RunOnStartupToggle.IsOn,
+            Theme = useDraft ? ThemeSelector.SelectedItem as string ?? "System" : _themeChoice,
+            TrayClickAction = useDraft ? (TrayClickSelector.SelectedItem as TrayActionChoice)?.Id ?? "Main" : _trayClickAction,
+            TrayDoubleClickAction = useDraft ? (TrayDoubleClickSelector.SelectedItem as TrayActionChoice)?.Id ?? "Main" : _trayDoubleClickAction,
             DelaySeconds = ReadyDelayBox.Value, HotkeyModifiers = keys["Typing"].Modifiers,
             HotkeyKey = keys["Typing"].Key, HotkeyLabel = keys["Typing"].Label,
             ScreenshotHotkey = keys["Screenshot"], ShareHotkey = keys["Share"],
@@ -585,8 +608,12 @@ public sealed partial class MainWindow : Window
         RhythmSlider.Value = settings.Rhythm;
         MistakeSlider.Value = settings.MistakeChance;
         ReadyDelayBox.Value = settings.DelaySeconds;
-        MinimizeToTrayToggle.IsOn = _minimizeToTray = settings.MinimizeToTray;
-        RunOnStartupToggle.IsOn = settings.RunOnStartup;
+        _minimizeToTray = settings.MinimizeToTray;
+        _themeChoice = settings.Theme;
+        _trayClickAction = settings.TrayClickAction;
+        _trayDoubleClickAction = settings.TrayDoubleClickAction;
+        _trayIcon?.CancelPendingClick();
+        ApplyGeneralDraft(settings);
         _activeHotkeys = settings.GetHotkeys();
         _draftHotkeys = new(_activeHotkeys);
         UpdateHotkeyLabels();
@@ -605,7 +632,8 @@ public sealed partial class MainWindow : Window
         }
         if (!_windowSubclassed) return;
         _trayIcon ??= new TrayIcon(_windowHandle, BuildTrayMenu,
-            action => DispatcherQueue.TryEnqueue(() => HandleTrayCommand(action)), () => AppSurface.ActualTheme);
+            action => DispatcherQueue.TryEnqueue(() => HandleTrayCommand(action)), () => AppSurface.ActualTheme,
+            () => (_trayClickAction, _trayDoubleClickAction));
         if (!_trayIcon.Show()) RegionSelectionText.Text = "Tray icon unavailable. The window will minimize normally.";
     }
 
@@ -631,7 +659,14 @@ public sealed partial class MainWindow : Window
         if (_isClosing) return;
         if (action == "Exit") { _exitRequested = true; Close(); return; }
         if (action == "Main") { ActivateExistingWindow(); return; }
+        if (action == "Captions") { Captions_Click(this, new RoutedEventArgs()); return; }
+        if (action == "Typing") { if (_sharingCompletion is null) StartPauseButton_Click(this, new RoutedEventArgs()); return; }
         if (_isRunning || _isReadingClipboard || _isSelectingRegion) return;
+        if (action == "Translate")
+        {
+            if (_sharingCompletion is not null) return;
+            ActivateExistingWindow(); TranslateButton_Click(this, new RoutedEventArgs()); return;
+        }
         if (action == "Settings") { ActivateExistingWindow(); SharingSettings_Click(this, new RoutedEventArgs()); return; }
         Button? tool = action switch { "QR" => QrToolButton, "Text Extract" => TextExtractToolButton,
             "Screenshot" => ScreenshotToolButton, "Share" => ShareToolButton, _ => null };
@@ -647,11 +682,11 @@ public sealed partial class MainWindow : Window
     }
 
     private void SettingsSection_Click(object sender, RoutedEventArgs e) =>
-        ScrollToSettingsSection((sender as ToggleButton)?.Tag as string ?? "Typing");
+        ScrollToSettingsSection((sender as ToggleButton)?.Tag as string ?? "General");
 
     private void ScrollToSettingsSection(string section)
     {
-        FrameworkElement target = section switch { "Backup" => BackupSettingsSection, "Translation" => TranslationSettingsSection, "Cloud" => CloudSettingsSection, "Hotkeys" => HotkeysSettingsSection, _ => TypingSettingsSection };
+        FrameworkElement target = section switch { "Summary" => SummarySettingsSection, "Typing" => TypingSettingsSection, "Translation" => TranslationSettingsSection, "Cloud" => CloudSettingsSection, "Hotkeys" => HotkeysSettingsSection, _ => GeneralSettingsSection };
         double offset = target.TransformToVisual(SettingsSections).TransformPoint(new(0, 0)).Y;
         SettingsScroller.ChangeView(null, offset, null, disableAnimation: true);
         SetSettingsSectionSelection(section);
@@ -660,22 +695,24 @@ public sealed partial class MainWindow : Window
     private void SetSettingsSectionSelection(string section)
     {
         TypingSettingsTab.IsChecked = section == "Typing";
+        GeneralSettingsTab.IsChecked = section is "General" or "Backup";
         CloudSettingsTab.IsChecked = section == "Cloud";
         HotkeysSettingsTab.IsChecked = section == "Hotkeys";
         TranslationSettingsTab.IsChecked = section == "Translation";
-        BackupSettingsTab.IsChecked = section == "Backup";
+        SummarySettingsTab.IsChecked = section == "Summary";
     }
 
     private void SettingsScroller_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
     {
-        if (BackupSettingsSection is null || BackupSettingsTab is null || TranslationSettingsSection is null || TranslationSettingsTab is null || HotkeysSettingsSection is null || SettingsSections is null || TypingSettingsTab is null || HotkeysSettingsTab is null) return;
+        if (SummarySettingsSection is null || SummarySettingsTab is null || GeneralSettingsSection is null || GeneralSettingsTab is null || TranslationSettingsSection is null || TranslationSettingsTab is null || HotkeysSettingsSection is null || SettingsSections is null || TypingSettingsTab is null || HotkeysSettingsTab is null) return;
+        double typingOffset = TypingSettingsSection.TransformToVisual(SettingsSections).TransformPoint(new(0, 0)).Y;
         double cloudOffset = CloudSettingsSection.TransformToVisual(SettingsSections).TransformPoint(new(0, 0)).Y;
         double keysOffset = HotkeysSettingsSection.TransformToVisual(SettingsSections).TransformPoint(new(0, 0)).Y;
         double translationOffset = TranslationSettingsSection.TransformToVisual(SettingsSections).TransformPoint(new(0, 0)).Y;
-        double backupOffset = BackupSettingsSection.TransformToVisual(SettingsSections).TransformPoint(new(0, 0)).Y;
+        double summaryOffset = SummarySettingsSection.TransformToVisual(SettingsSections).TransformPoint(new(0, 0)).Y;
         bool atEnd = SettingsScroller.VerticalOffset > 0 && SettingsScroller.VerticalOffset >= SettingsScroller.ScrollableHeight - 1;
-        SetSettingsSectionSelection(atEnd || SettingsScroller.VerticalOffset >= backupOffset - 10 ? "Backup" : SettingsScroller.VerticalOffset >= translationOffset - 10 ? "Translation" : SettingsScroller.VerticalOffset >= keysOffset - 10 ? "Hotkeys"
-            : SettingsScroller.VerticalOffset >= cloudOffset - 10 ? "Cloud" : "Typing");
+        SetSettingsSectionSelection(atEnd || SettingsScroller.VerticalOffset >= summaryOffset - 10 ? "Summary" : SettingsScroller.VerticalOffset >= translationOffset - 10 ? "Translation" : SettingsScroller.VerticalOffset >= keysOffset - 10 ? "Hotkeys"
+            : SettingsScroller.VerticalOffset >= cloudOffset - 10 ? "Cloud" : SettingsScroller.VerticalOffset >= typingOffset - 10 ? "Typing" : "General");
     }
 
     private void ShareHistory_Click(object sender, RoutedEventArgs e)
@@ -810,11 +847,19 @@ public sealed partial class MainWindow : Window
 
     public MainWindow() : this(TypingSettingsStore.Load() with { RunOnStartup = StartupRegistration.IsEnabled }, true) { }
 
-    internal MainWindow(TypingSettings initialSettings, bool registerHotkeys)
+    internal MainWindow(TypingSettings initialSettings, bool registerHotkeys,
+        SummarySettings? initialSummary = null, Func<string,string,CancellationToken,Task<string>>? summaryRequest = null)
     {
+        _persistPreferences = registerHotkeys;
         _audioPersistSettings = registerHotkeys;
         _windowSubclassProc = WindowSubclassProc;
         InitializeComponent();
+        _summaryRequestOverride = summaryRequest;
+        _summarySettings = initialSummary ?? (registerHotkeys ? SummarySettingsStore.Load() : new());
+        MainSummaryPanel.Expanding += (_, _) => MainSummaryPanel.Width = 300;
+        MainSummaryPanel.Collapsed += (_, _) => MainSummaryPanel.Width = 160;
+        InitializeGeneralSettings();
+        SettingsScroller.SizeChanged += (_, _) => UpdateSettingsEndPadding();
         InitializeAudioPanel();
         _translationSettings = registerHotkeys ? TranslationSettingsStore.Load() : new();
         TranslationLanguage.ItemsSource = TranslationSettings.Languages;
@@ -844,7 +889,7 @@ public sealed partial class MainWindow : Window
         var updated = _translationSettings with { TargetLanguage = language };
         try
         {
-            TranslationSettingsStore.Save(updated);
+            if (_persistPreferences) TranslationSettingsStore.Save(updated);
             _translationSettings = updated;
             SetRegionToolsEnabled(!_isRunning && !_isReadingClipboard && !_isSelectingRegion);
         }
@@ -1210,6 +1255,8 @@ public sealed partial class MainWindow : Window
 
     private void SourceBox_TextChanged(object sender, TextChangedEventArgs e)
     {
+        UpdateSummaryButton();
+        UpdateSummarySourceStatus();
         if (!_isRunning)
         {
             _hasProgress = false;
@@ -1796,6 +1843,8 @@ public sealed partial class MainWindow : Window
     private void MainWindow_Closed(object sender, WindowEventArgs args)
     {
         _isClosing = true;
+        _summaryCancellation?.Cancel();
+        _captionWindow?.Close();
         StopAudioPreview();
         _trayIcon?.Dispose();
         _trayIcon = null;

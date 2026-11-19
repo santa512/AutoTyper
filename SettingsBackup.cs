@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace AutoTyper;
 
-internal sealed record SettingsBundle(TypingSettings Typing, SharingSettings? Sharing, TranslationSettings Translation)
+internal sealed record SettingsBundle(TypingSettings Typing, SharingSettings? Sharing, TranslationSettings Translation, SummarySettings? Summary = null)
 {
     internal void Validate()
     {
@@ -12,6 +12,7 @@ internal sealed record SettingsBundle(TypingSettings Typing, SharingSettings? Sh
         Typing.Validate();
         Sharing?.Validate();
         Translation.Validate(requireKey: false);
+        Summary?.Validate(requireKey: false);
     }
 }
 
