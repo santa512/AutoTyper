@@ -808,17 +808,21 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    public MainWindow()
+    public MainWindow() : this(TypingSettingsStore.Load() with { RunOnStartup = StartupRegistration.IsEnabled }, true) { }
+
+    internal MainWindow(TypingSettings initialSettings, bool registerHotkeys)
     {
+        _audioPersistSettings = registerHotkeys;
         _windowSubclassProc = WindowSubclassProc;
         InitializeComponent();
-        _translationSettings = TranslationSettingsStore.Load();
+        InitializeAudioPanel();
+        _translationSettings = registerHotkeys ? TranslationSettingsStore.Load() : new();
         TranslationLanguage.ItemsSource = TranslationSettings.Languages;
         TranslationLanguage.SelectedItem = _translationSettings.TargetLanguage;
-        ApplyTypingSettings(TypingSettingsStore.Load() with { RunOnStartup = StartupRegistration.IsEnabled });
-        _sharingSettings = SharingSettingsStore.Load();
+        ApplyTypingSettings(initialSettings);
+        _sharingSettings = registerHotkeys ? SharingSettingsStore.Load() : null;
         SetRegionToolsEnabled(true);
-        RegisterGlobalHotkey();
+        RegisterGlobalHotkey(registerHotkeys);
         UpdateTrayIcon();
         AppSurface.Loaded += (_, _) => UpdateTitleBarTheme();
         AppSurface.ActualThemeChanged += (_, _) => DispatcherQueue.TryEnqueue(UpdateTitleBarTheme);
@@ -1616,13 +1620,14 @@ public sealed partial class MainWindow : Window
         titleBar.ButtonPressedForegroundColor = foreground;
     }
 
-    private void RegisterGlobalHotkey()
+    private void RegisterGlobalHotkey(bool enabled = true)
     {
         _windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(this);
         Microsoft.UI.Windowing.AppWindow appWindow =
             Microsoft.UI.Windowing.AppWindow.GetFromWindowId(
                 Microsoft.UI.Win32Interop.GetWindowIdFromWindow(_windowHandle));
-        appWindow.Resize(new Windows.Graphics.SizeInt32(1000, 800));
+        double windowScale = Math.Max(96u, GetDpiForWindow(_windowHandle)) / 96d;
+        appWindow.Resize(new Windows.Graphics.SizeInt32((int)Math.Ceiling(1280 * windowScale), (int)Math.Ceiling(820 * windowScale)));
         appWindow.SetIcon(System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "AutoTyper.ico"));
 
         if (!SetWindowSubclass(
@@ -1638,6 +1643,7 @@ public sealed partial class MainWindow : Window
         }
 
         _windowSubclassed = true;
+        if (!enabled) { RecordHotkeyButton.IsEnabled = false; return; }
         _globalHotkeys = new((id, modifiers, key) => RegisterHotKey(_windowHandle, id, modifiers, key),
             id => UnregisterHotKey(_windowHandle, id));
         RegisterActiveHotkeys();
@@ -1740,6 +1746,17 @@ public sealed partial class MainWindow : Window
         UIntPtr subclassId,
         IntPtr refData)
     {
+        // Apply a DPI-scaled native resize limit, including when shortcuts are disabled.
+        if (message == 0x0024 && lParam != IntPtr.Zero) // WM_GETMINMAXINFO
+        {
+            IntPtr result = DefSubclassProc(hWnd, message, wParam, lParam);
+            var limits = Marshal.PtrToStructure<WindowSizeLimits>(lParam);
+            double scale = Math.Max(96u, GetDpiForWindow(hWnd)) / 96d;
+            int minimumWidth = AudioPanel.Visibility == Visibility.Visible ? 1200 : 940;
+            limits.MinimumTrack.X = Math.Max(limits.MinimumTrack.X, (int)Math.Ceiling(minimumWidth * scale));
+            Marshal.StructureToPtr(limits, lParam, false);
+            return result;
+        }
         if (_trayIcon?.ProcessMessage(message, wParam, lParam) == true) return IntPtr.Zero;
         if (!_exitRequested && !_isClosing && _minimizeToTray && _trayIcon?.IsVisible == true)
         {
@@ -1779,6 +1796,7 @@ public sealed partial class MainWindow : Window
     private void MainWindow_Closed(object sender, WindowEventArgs args)
     {
         _isClosing = true;
+        StopAudioPreview();
         _trayIcon?.Dispose();
         _trayIcon = null;
         _sharingCompletion?.TrySetResult(null);
@@ -1802,6 +1820,16 @@ public sealed partial class MainWindow : Window
         int Position,
         char CorrectCharacter,
         int DueAtSourceIndex);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WindowPoint { public int X, Y; }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WindowSizeLimits
+    {
+        public WindowPoint Reserved, MaximumSize, MaximumPosition, MinimumTrack, MaximumTrack;
+    }
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr window);
 
     [UnmanagedFunctionPointer(CallingConvention.Winapi)]
     private delegate IntPtr SubclassProc(

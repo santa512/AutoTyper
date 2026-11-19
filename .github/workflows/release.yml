@@ -5,14 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing release tag (for example v0.2.2)
+        description: Existing main-x64 release tag (for example v0.3)
         required: true
-        default: v0.2.2
-      edition:
-        description: Edition to build and publish
-        type: choice
-        options: [both, winui, compact]
-        default: both
+        default: v0.3
 permissions:
   contents: read
 jobs:
@@ -20,7 +15,7 @@ jobs:
     uses: ./.github/workflows/build-platforms.yml
     with:
       source-ref: ${{ inputs.tag || github.ref_name }}
-      edition: ${{ inputs.edition || 'both' }}
+      edition: winui
   release:
     needs: build
     runs-on: ubuntu-latest
