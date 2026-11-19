@@ -69,7 +69,7 @@ Run `dotnet run --project tests/Translation.Tests -c Release` to check request c
 
 ## Export and import settings
 
-Open **Settings → Export / Import** and enter a backup password of at least eight characters. **Export settings** saves an encrypted `.autotyper` file containing the current typing settings, all six hotkeys, Cloudflare configuration and both R2 keys, and Microsoft Translator configuration and API key. The backup can be imported on another PC using the same password. It uses AES-256-GCM encryption with a password-derived key; the password is not stored and cannot be recovered.
+Open **Settings → General → Export / Import** and enter a backup password of at least eight characters. **Export settings** saves an encrypted `.autotyper` file containing the current typing settings, all six hotkeys, Cloudflare configuration and both R2 keys, Microsoft Translator configuration and API key, and both Groq keys. The backup can be imported on another PC using the same password. It uses AES-256-GCM encryption with a password-derived key; the password is not stored and cannot be recovered.
 
 **Import settings** loads the backup into Settings for review. **Save** applies and persists imported values, checking hotkey availability on this PC. **Back → No** discards the import. Wrong passwords and damaged files leave settings unchanged. Backups contain configuration; input text and shared URL history are not included.
 
@@ -83,7 +83,7 @@ Run `dotnet run --project tests/SingleInstance.Tests` for isolated process tests
 
 ## Minimize to tray
 
-Enable **Settings → Auto Typer → Minimize to tray**, then Save. The option is off by default and persists between launches. While enabled, Minimize and Close hide the window in the notification area instead of quitting. Global hotkeys keep working when the main window is hidden. Click the tray icon or open the EXE again to restore the same window.
+Enable **Settings → General → Minimize to tray**, then Save. The option is off by default and persists between launches. While enabled, Minimize and Close hide the window in the notification area instead of quitting. Global hotkeys keep working when the main window is hidden. Click the tray icon or open the EXE again to restore the same window.
 
 Right-click the tray icon for **Main**, **QR code**, **OCR / Text extract**, **Screenshot**, **Instant share**, **Settings**, and **Exit**. The menu follows the app's light or dark theme, uses a temporary topmost window, and stays within the monitor work area above the taskbar. Menu entries include icons and the currently registered action shortcuts. Click outside or press Escape to dismiss it; arrow keys navigate enabled actions. Instant Share requires Cloudflare setup; capture tools and Settings are disabled while another operation or settings edit is active. Main always restores the window, and Exit quits and removes the tray icon. Tools started while hidden return to the tray after completion unless you explicitly restore the main window during the operation. Windows may place the icon under its hidden-icons arrow.
 
@@ -91,7 +91,7 @@ Turning the option off removes the tray icon and restores normal Minimize/Close 
 
 ## Run on startup
 
-Enable **Settings → Auto Typer → Run on startup**, then Save. This is off by default and registers the current EXE for your Windows account at sign-in. If Minimize to tray is enabled, it starts in the tray. Disabling it removes the registration. Keep portable copies in a permanent folder and save the setting again if you move the EXE. The preference is included in encrypted settings backups; importing and saving uses the receiving PC's EXE path.
+Enable **Settings → General → Run on startup**, then Save. This is off by default and registers the current EXE for your Windows account at sign-in. If Minimize to tray is enabled, it starts in the tray. Disabling it removes the registration. Keep portable copies in a permanent folder and save the setting again if you move the EXE. The preference is included in encrypted settings backups; importing and saving uses the receiving PC's EXE path.
 
 ## Setup installers
 
@@ -117,7 +117,7 @@ OCR model sources, versions, checksums, and license notices are included under `
 
 ### Share screenshots to R2
 
-Open the gear icon for the in-window Settings page. **Auto Typer** is the default section, containing pace, rhythm, mistake chance and a wider delay input. **Cloudflare bucket** is the second section and **Hotkeys** is the third. Settings use two columns: vertical navigation on the left and scrollable content on the right. Navigation jumps to each section on the same page. **Back** and **Save** sit together at the bottom right and stay fixed while scrolling. Save stores typing preferences between launches, and Back leaves immediately if nothing changed. With unsaved typing, hotkey or Cloudflare changes, a compact prompt appears above Back and Save: **Yes** saves before leaving; **No** discards the edits. Cloudflare setup is optional when saving typing preferences. Enter your Cloudflare account ID, bucket name, Access Key ID, Secret Access Key, and public bucket URL. The supplied public R2 URL is prefilled. Choose the bucket jurisdiction if it differs from Default. No Worker, server, or command-line setup is required.
+Open the gear icon for the in-window Settings page. **General** is the default section for startup, tray behavior, theme and encrypted backups. **Auto Typer** contains pace, rhythm, mistake chance and delay. Other sections configure Cloudflare, Hotkeys, Translation and AI summaries. Settings use two columns: vertical navigation on the left and scrollable content on the right. Navigation jumps to each section on the same page. **Back** and **Save** sit together at the bottom right and stay fixed while scrolling. Save stores typing preferences between launches, and Back leaves immediately if nothing changed. With unsaved typing, hotkey or Cloudflare changes, a compact prompt appears above Back and Save: **Yes** saves before leaving; **No** discards the edits. Cloudflare setup is optional when saving typing preferences. Enter your Cloudflare account ID, bucket name, Access Key ID, Secret Access Key, and public bucket URL. The supplied public R2 URL is prefilled. Choose the bucket jurisdiction if it differs from Default. No Worker, server, or command-line setup is required.
 
 Create an [R2 API token](https://developers.cloudflare.com/r2/api/tokens/) with **Object Read & Write** permission scoped to your screenshot bucket. Use its Access Key ID and Secret Access Key, rather than a general Cloudflare bearer token. Enable public access to that same bucket and copy its public URL into the app. Save validates and stores the configuration locally; it does not upload a test file or verify the bucket's public access.
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3 — In development (main x64)
+## 0.3 — 2026-11-19 (main x64)
 
 - Add Groq summary icons next to Translate in the main input and caption overlay. Show summaries in separate expandable panels while preserving input and ongoing captions; support encrypted primary/secondary keys with bounded quota failover.
 
