@@ -32,7 +32,7 @@ assert(/14 days/.test(html) && /tray/i.test(html) && /English/.test(html), 'Curr
 assert(/Microsoft Translator/.test(html) && /encrypted backup/.test(html) && /Six global shortcuts/.test(html), 'Translation, backup and sixth hotkey are documented');
 assert(/ARM64/.test(html) && /Run on startup/.test(html) && /Setup MSI/.test(html), 'Architectures, startup and setup downloads are documented');
 assert(!/\b(?:MiB|KiB)\b/.test(html + readme), 'Public download sizes use decimal units');
-assert(html.includes('128.8 MB') && html.includes('238.6 KB'), 'Offline sizes match the published assets');
+assert(html.includes('128.4 MB') && html.includes('238.6 KB'), 'Offline sizes match the published assets');
 
 async function metadataCase(failedTag) {
   const labels = { 'AutoTyper.exe': { textContent: 'fallback' }, 'AutoTyperCompact.exe': { textContent: 'fallback' } };
@@ -42,7 +42,7 @@ async function metadataCase(failedTag) {
       requested.push(url);
       if (url.endsWith('/' + failedTag)) throw new Error('offline');
       return { ok: true, json: async () => ({ assets: [
-        ...(url.endsWith('/v0.3') ? [{ name: 'AutoTyper.exe', size: 128779797 }] : [{ name: 'AutoTyperCompact.exe', size: 238592 }])
+        ...(url.endsWith('/v0.3') ? [{ name: 'AutoTyper.exe', size: 128426839 }] : [{ name: 'AutoTyperCompact.exe', size: 238592 }])
       ] }) };
     },
     document: { querySelectorAll: selector => {
@@ -53,7 +53,7 @@ async function metadataCase(failedTag) {
   });
   await new Promise(setImmediate);
   assert.deepEqual(requested.sort(), ['v0.2.2', tag].map(t => `https://api.github.com/repos/santa512/AutoTyper/releases/tags/${t}`).sort());
-  assert.equal(labels['AutoTyper.exe'].textContent, failedTag === tag ? 'fallback' : '128.8 MB');
+  assert.equal(labels['AutoTyper.exe'].textContent, failedTag === tag ? 'fallback' : '128.4 MB');
   assert.equal(labels['AutoTyperCompact.exe'].textContent, failedTag === 'v0.2.2' ? 'fallback' : '238.6 KB');
 }
 await metadataCase(null);
