@@ -2,6 +2,13 @@
 
 ## 0.3 — In development (main x64)
 
+- Add Groq summary icons next to Translate in the main input and caption overlay. Show summaries in separate expandable panels while preserving input and ongoing captions; support encrypted primary/secondary keys with bounded quota failover.
+
+- Add a General settings section for startup, tray mode, theme, encrypted export/import and separate tray click/double-click actions; preview theme changes and restore them when discarded.
+
+- Add a pinned live-caption overlay with local English recognition of system audio and an optional microphone stream, labeled System / Mic. Download and verify the English model on first use.
+- Translate only new caption segments into the main input using existing Microsoft Translator settings; preserve text on failure and keep newer captions pending during requests.
+
 - Add a collapsible left audio panel for local microphone-to-headphones preview, with microphone and output selection, depth, body, preview volume, original-voice comparison and level meters.
 - Use pinned MIT-licensed Signalsmith Stretch/Linear for formant-preserving pitch adjustment, plus local warmth EQ, gentle compression and output limiting. No audio API key, cloud processing, recording or virtual microphone driver is used.
 - Keep preview off until explicitly started; stop capture on Stop, panel collapse or app exit. Save audio preferences locally between sessions.

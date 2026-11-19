@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0-windows</TargetFramework><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><PlatformTarget>x64</PlatformTarget></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../CaptionTranscript.cs" Link="CaptionTranscript.cs" />
+    <Compile Include="../../CaptionModel.cs" Link="CaptionModel.cs" />
+    <Compile Include="../../CaptionSession.cs" Link="CaptionSession.cs" />
+    <Compile Include="../../CaptionSpeechRuntime.cs" Link="CaptionSpeechRuntime.cs" />
+    <Compile Include="../../MicrosoftTranslator.cs" Link="MicrosoftTranslator.cs" />
+    <Compile Include="../../TranslationSettings.cs" Link="TranslationSettings.cs" />
+    <Compile Include="../../SharingSettings.cs" Link="SharingSettings.cs" />
+    <PackageReference Include="NAudio.Wasapi" Version="3.3.0" />
+    <PackageReference Include="Vosk" Version="0.3.38" />
+  </ItemGroup>
+</Project>

@@ -19,6 +19,8 @@ foreach ($name in @('AutoTyper','AutoTyperCompact')) {
     if ($name -eq 'AutoTyper') {
         $probe = Start-Process -FilePath $exe -ArgumentList '--audio-self-test' -Wait -PassThru -WindowStyle Hidden
         if ($probe.ExitCode -ne 0) { throw 'Packaged local audio processor self-test failed.' }
+        $probe = Start-Process -FilePath $exe -ArgumentList '--caption-self-test' -Wait -PassThru -WindowStyle Hidden
+        if ($probe.ExitCode -ne 0) { throw 'Packaged local caption engine self-test failed.' }
     }
     $msi = Join-Path $assets "$name-Setup-$Architecture.msi"
     $log = Join-Path $env:RUNNER_TEMP "$name-install.log"

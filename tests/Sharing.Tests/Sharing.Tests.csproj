@@ -9,10 +9,12 @@
     <Compile Include="..\..\SharingSettings.cs" Link="SharingSettings.cs" />
     <Compile Include="..\..\ScreenshotShareClient.cs" Link="ScreenshotShareClient.cs" />
     <Compile Include="..\..\TypingSettings.cs" Link="TypingSettings.cs" />
+    <Compile Include="..\..\TrayClickTracker.cs" Link="TrayClickTracker.cs" />
     <Compile Include="..\..\ShareHistory.cs" Link="ShareHistory.cs" />
     <Compile Include="..\..\GlobalHotkeys.cs" Link="GlobalHotkeys.cs" />
     <Compile Include="..\..\TranslationSettings.cs" Link="TranslationSettings.cs" />
     <Compile Include="..\..\SettingsBackup.cs" Link="SettingsBackup.cs" />
+    <Compile Include="..\..\SummarySettings.cs" Link="SummarySettings.cs" />
     <Compile Include="..\..\StartupRegistration.cs" Link="StartupRegistration.cs" />
   </ItemGroup>
 </Project>

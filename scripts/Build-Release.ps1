@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory)][ValidateSet('x64')][string]$Architecture,
     [ValidateSet('both','winui','compact')][string]$Edition = 'winui',
-    [string]$WixPath = '.tools/wix/wix.exe'
+    [string]$WixPath = '.tools/wix/wix.exe',
+    [string]$OutputDirectory = ''
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
@@ -15,7 +16,8 @@ try {
         if ([BitConverter]::ToUInt16($bytes, $header + 4) -ne $machine) { throw "Wrong OCR runtime architecture: $($runtime.Name)" }
     }
     $work = Join-Path $root "dist/build-$Architecture"
-    $assets = Join-Path $root "dist/release-$Architecture"
+    $assets = if ($OutputDirectory) { [IO.Path]::GetFullPath($OutputDirectory, $root) }
+        else { Join-Path $root "dist/release-$Architecture" }
     New-Item -ItemType Directory -Path $assets -Force | Out-Null
     [xml]$project = Get-Content AutoTyper.csproj
     $version = $project.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1

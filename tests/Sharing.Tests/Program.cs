@@ -76,12 +76,13 @@ Directory.CreateDirectory(testDir);
 string typingPath = Path.Combine(testDir,"typing.json"), historyPath = Path.Combine(testDir,"history.dat");
 try
 {
-    var options = new TypingSettings { Pace=1.7, Rhythm=0.8, MistakeChance=0.03, DelaySeconds=4, MinimizeToTray=true, HotkeyModifiers=0x4003,HotkeyKey=0x51,HotkeyLabel="Ctrl+Alt+Q", TranslateHotkey=new(0x4003,0x54,"Ctrl+Alt+T") };
+    var options = new TypingSettings { Pace=1.7, Rhythm=0.8, MistakeChance=0.03, DelaySeconds=4, MinimizeToTray=true, Theme="Light", TrayClickAction="Menu", TrayDoubleClickAction="Captions", HotkeyModifiers=0x4003,HotkeyKey=0x51,HotkeyLabel="Ctrl+Alt+Q", TranslateHotkey=new(0x4003,0x54,"Ctrl+Alt+T") };
     TypingSettingsStore.Save(options,typingPath);
     Require(TypingSettingsStore.Load(typingPath)==options,"Typing settings persist across reloads");
     await Fail(()=>Task.Run(()=>TypingSettingsStore.Save(options with { DelaySeconds=double.NaN },typingPath)));
     File.WriteAllText(typingPath,"{\"HotkeyModifiers\":16390,\"HotkeyKey\":83,\"HotkeyLabel\":\"Ctrl+Shift+S\",\"Pace\":1.4}");
     var migrated=TypingSettingsStore.Load(typingPath);
+    Require(migrated.Theme=="System"&&migrated.TrayClickAction=="Main"&&migrated.TrayDoubleClickAction=="Main","Older preferences retain System theme and main-window tray actions");
     Require(migrated.Pace==1.4 && migrated.HotkeyKey==83 && migrated.ScreenshotHotkey.Modifiers==0x4007,"Legacy shortcut collisions migrate without losing typing preferences");
     string oldOptions = System.Text.Json.JsonSerializer.Serialize(options with { ShareHotkey = new(0x4006,0x54,"Ctrl+Shift+T") });
     var oldNode = System.Text.Json.Nodes.JsonNode.Parse(oldOptions)!.AsObject();
@@ -123,16 +124,29 @@ StartupRegistration.Apply(false,write:value=>startupCommand=value);
 Require(startupCommand is null,"Disabling startup removes only the app's startup value");
 await Fail(()=>Task.Run(()=>StartupRegistration.BuildCommand("relative.exe")));
 await Fail(()=>Task.Run(()=>StartupRegistration.BuildCommand("C:\\bad\"path.exe")));
-var backup = new SettingsBundle(new TypingSettings { Pace=1.6, RunOnStartup=true, TranslateHotkey=new(0x4003,0x54,"Ctrl+Alt+T") },
-    settings, new TranslationSettings { ApiKey="test-translator-key-123456", Region="eastus", TargetLanguage="Japanese" });
+var clicks = new TrayClickTracker();
+clicks.ButtonDown();Require(clicks.Select()&&clicks.TakeSingle()&&!clicks.TakeSingle(),"One tray click runs one action after the delay");
+clicks.ButtonDown();clicks.Select();clicks.DoubleClick();
+Require(!clicks.TakeSingle()&&!clicks.Select(),"Double-click cancels the single action and ignores its trailing activation");
+clicks.ButtonDown();Require(clicks.Select()&&clicks.TakeSingle(),"A new click works after a double-click");
+clicks.ButtonDown();clicks.Select();clicks.Cancel();Require(!clicks.TakeSingle(),"Right-click, keyboard activation or disposal cancels a pending single action");
+await Fail(()=>Task.Run(()=>new TypingSettings { Theme="Unknown" }.Validate()));
+await Fail(()=>Task.Run(()=>new TypingSettings { TrayClickAction="Unknown" }.Validate()));
+await Fail(()=>Task.Run(()=>new TypingSettings { TrayDoubleClickAction=null! }.Validate()));
+var backup = new SettingsBundle(new TypingSettings { Pace=1.6, RunOnStartup=true, Theme="Dark", TrayClickAction="None", TrayDoubleClickAction="Screenshot", TranslateHotkey=new(0x4003,0x54,"Ctrl+Alt+T") },
+    settings, new TranslationSettings { ApiKey="test-translator-key-123456", Region="eastus", TargetLanguage="Japanese" },
+    new SummarySettings { ApiKey="test-groq-primary-key-123456", SecondaryApiKey="test-groq-secondary-key-123456" });
 const string backupPassword = "test backup password";
 byte[] backupData = SettingsBackup.Export(backup, backupPassword);
 var restored = SettingsBackup.Import(backupData, backupPassword);
 Require(restored.Typing==backup.Typing && restored.Translation==backup.Translation
+    && restored.Summary==backup.Summary
     && restored.Sharing!.AccessKeyId==settings.AccessKeyId && restored.Sharing.SecretAccessKey==settings.SecretAccessKey
     && restored.Sharing.BucketName==settings.BucketName, "Portable backup round trip preserves all API keys, preferences and hotkeys");
 Require(!Encoding.UTF8.GetString(backupData).Contains(settings.SecretAccessKey)
-    && !Encoding.UTF8.GetString(backupData).Contains(backup.Translation.ApiKey), "Export does not expose API keys as plaintext");
+    && !Encoding.UTF8.GetString(backupData).Contains(backup.Translation.ApiKey)
+    && !Encoding.UTF8.GetString(backupData).Contains(backup.Summary!.ApiKey)
+    && !Encoding.UTF8.GetString(backupData).Contains(backup.Summary.SecondaryApiKey), "Export does not expose API keys as plaintext");
 Require(!backupData.SequenceEqual(SettingsBackup.Export(backup,backupPassword)), "Fresh export uses random salt and nonce");
 await Fail(()=>Task.Run(()=>SettingsBackup.Import(backupData,"wrong password")));
 await Fail(()=>Task.Run(()=>SettingsBackup.Export(backup,"short")));

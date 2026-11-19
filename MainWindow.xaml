@@ -13,10 +13,9 @@
                 <Grid><TextBlock Text="Audio" FontSize="22" FontWeight="SemiBold" /><Button x:Name="AudioRefreshButton" HorizontalAlignment="Right" Width="30" Height="30" MinWidth="30" Padding="0" Click="AudioRefresh_Click" ToolTipService.ToolTip="Refresh audio devices" AutomationProperties.Name="Refresh audio devices"><FontIcon Glyph="&#xE72C;" FontSize="14" /></Button></Grid>
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel Spacing="8">
-                    <TextBlock Text="Natural voice" FontSize="16" FontWeight="SemiBold" />
                     <ComboBox x:Name="AudioMicrophone" Header="Microphone" HorizontalAlignment="Stretch" SelectionChanged="AudioDevice_SelectionChanged" AutomationProperties.Name="Microphone for voice preview" />
                     <ComboBox x:Name="AudioHeadphones" Header="Headphones" HorizontalAlignment="Stretch" SelectionChanged="AudioDevice_SelectionChanged" AutomationProperties.Name="Headphones for voice preview" />
-                    <StackPanel Spacing="2"><Grid><TextBlock Text="Depth" /><TextBlock x:Name="AudioDepthValue" HorizontalAlignment="Right" /></Grid><Slider x:Name="AudioDepthSlider" Minimum="0" Maximum="3" Value="1" StepFrequency="0.1" ValueChanged="AudioOption_Changed" AutomationProperties.Name="Voice depth in semitones" /><TextBlock Text="Keeps your natural tone" TextWrapping="Wrap" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel>
+                    <StackPanel Spacing="2"><Grid><TextBlock Text="Depth" /><TextBlock x:Name="AudioDepthValue" HorizontalAlignment="Right" /></Grid><Slider x:Name="AudioDepthSlider" Minimum="0" Maximum="3" Value="1" StepFrequency="0.1" ValueChanged="AudioOption_Changed" AutomationProperties.Name="Voice depth in semitones" /></StackPanel>
                     <StackPanel Spacing="2"><Grid><TextBlock Text="Body" /><TextBlock x:Name="AudioBodyValue" HorizontalAlignment="Right" /></Grid><Slider x:Name="AudioBodySlider" Minimum="0" Maximum="100" Value="45" StepFrequency="1" ValueChanged="AudioOption_Changed" AutomationProperties.Name="Voice body" /></StackPanel>
                     <StackPanel Spacing="2"><Grid><TextBlock Text="Preview volume" /><TextBlock x:Name="AudioVolumeValue" HorizontalAlignment="Right" /></Grid><Slider x:Name="AudioVolumeSlider" Minimum="0" Maximum="100" Value="35" StepFrequency="1" ValueChanged="AudioOption_Changed" AutomationProperties.Name="Headphone preview volume" /></StackPanel>
                     <ToggleSwitch x:Name="AudioOriginalToggle" Header="Compare" OffContent="Thicker voice" OnContent="Original voice" Toggled="AudioOriginal_Toggled" />
@@ -25,15 +24,11 @@
                 <StackPanel Grid.Row="2" Spacing="8">
                     <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><TextBlock Text="Mic" FontSize="11" VerticalAlignment="Center" /><ProgressBar x:Name="AudioInputMeter" Grid.Column="1" Height="3" Minimum="0" Maximum="100" AutomationProperties.Name="Microphone level" /></Grid>
                     <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><TextBlock Text="Out" FontSize="11" VerticalAlignment="Center" /><ProgressBar x:Name="AudioOutputMeter" Grid.Column="1" Height="3" Minimum="0" Maximum="100" AutomationProperties.Name="Preview output level" /></Grid>
-                    <Border Padding="10,6" CornerRadius="6" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
-                        <StackPanel Orientation="Horizontal" Spacing="8"><Ellipse x:Name="AudioStateDot" Width="8" Height="8" Fill="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" /><TextBlock x:Name="AudioStateText" Text="Preview off" FontSize="12" FontWeight="SemiBold" AutomationProperties.LiveSetting="Polite" /></StackPanel>
-                    </Border>
                     <Button x:Name="AudioStartButton" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Click="AudioStart_Click" IsEnabled="False" Style="{StaticResource AccentButtonStyle}" AutomationProperties.Name="Start preview">
                         <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon x:Name="AudioStartIcon" Glyph="&#xE768;" FontSize="14" /><TextBlock x:Name="AudioStartLabel" Text="Start preview" /></StackPanel>
                     </Button>
                     <TextBlock x:Name="AudioStatus" Text="Checking audio devices…" FontSize="12" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
                     <TextBlock x:Name="AudioLatency" Visibility="Collapsed" FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <TextBlock Text="Headphone preview · Fully local" FontSize="11" FontWeight="SemiBold" /><TextBlock Text="Use headphones to avoid feedback. No audio is recorded or uploaded." FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
             </Grid>
         </Border>
@@ -62,6 +57,7 @@
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
         </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+            <Button x:Name="CaptionsButton" Click="Captions_Click" Width="36" Height="36" MinWidth="36" Padding="0" AutomationProperties.Name="Live captions" ToolTipService.ToolTip="Live English captions · System audio, with optional microphone"><TextBlock Text="CC" FontSize="14" FontWeight="Bold" /></Button>
             <ToggleButton x:Name="AudioPanelButton" IsChecked="True" Click="AudioPanel_Click" Width="36" Height="36" MinWidth="36" Padding="0" AutomationProperties.Name="Show audio panel" ToolTipService.ToolTip="Audio headphone preview"><FontIcon Glyph="&#xE720;" FontSize="17" /></ToggleButton>
             <Button x:Name="SharingSettingsButton" Click="SharingSettings_Click" Width="36" Height="36" MinWidth="36" Padding="0" AutomationProperties.Name="Settings" ToolTipService.ToolTip="Settings">
                 <FontIcon Glyph="&#xE713;" FontSize="17" />
@@ -115,6 +111,7 @@
                                 ToolTipService.ToolTip="Translate clipboard text with Microsoft Translator">
                             <FontIcon Glyph="&#xF2B7;" FontSize="17" />
                         </Button>
+                        <Button x:Name="SummarizeButton" Width="36" Height="36" MinWidth="36" Padding="0" IsEnabled="False" Click="Summarize_Click" AutomationProperties.Name="Summarize input text" ToolTipService.ToolTip="Summarize input text with Groq"><PathIcon Width="18" Height="18" Data="M10,1 L12.6,7.4 L19,10 L12.6,12.6 L10,19 L7.4,12.6 L1,10 L7.4,7.4 Z M20,0 L21.2,2.8 L24,4 L21.2,5.2 L20,8 L18.8,5.2 L16,4 L18.8,2.8 Z" /></Button>
                         <Button x:Name="ClipboardButton" VerticalAlignment="Center"
                                 Width="36" Height="36" MinWidth="36" Padding="0"
                                 Click="ClipboardButton_Click" AutomationProperties.Name="Paste from clipboard"
@@ -123,9 +120,11 @@
                         </Button>
                         </StackPanel>
                     </Grid>
+                    <Grid Grid.Row="1" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                     <TextBox
                         x:Name="SourceBox"
-                        Grid.Row="1"
+                        Grid.Column="0"
                         MinHeight="100"
                         SelectionHighlightColorWhenNotFocused="#FFB8860B"
                         SelectionHighlightColor="#FFB8860B"
@@ -134,6 +133,14 @@
                         ScrollViewer.VerticalScrollBarVisibility="Auto"
                         TextChanged="SourceBox_TextChanged"
                         Text="The best way to improve your typing is to practice at a comfortable pace." />
+                        <Expander x:Name="MainSummaryPanel" Grid.Column="1" Header="AI summary" Width="300" Visibility="Collapsed" HorizontalContentAlignment="Stretch" VerticalAlignment="Top">
+                            <StackPanel Spacing="8">
+                                <TextBlock x:Name="MainSummaryStatus" FontSize="12" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+                                <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><TextBlock x:Name="MainSummaryText" TextWrapping="Wrap" IsTextSelectionEnabled="True" /></ScrollViewer>
+                                <Button Width="28" Height="28" MinWidth="28" Padding="0" HorizontalAlignment="Right" Click="MainSummaryClose_Click" AutomationProperties.Name="Close summary" ToolTipService.ToolTip="Close summary"><FontIcon Glyph="&#xE711;" FontSize="12" /></Button>
+                            </StackPanel>
+                        </Expander>
+                    </Grid>
                     <Border x:Name="HistoryPanel" Grid.Row="2" Visibility="Collapsed" Padding="12" CornerRadius="8"
                             Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                         <StackPanel Spacing="8">
@@ -265,14 +272,39 @@
             <Grid.ColumnDefinitions><ColumnDefinition Width="168" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
             <TextBlock Grid.ColumnSpan="2" Text="Settings" FontSize="26" FontWeight="SemiBold" />
             <StackPanel Grid.Row="1" Spacing="8">
-                <ToggleButton x:Name="TypingSettingsTab" Content="Auto Typer" Tag="Typing" IsChecked="True" Click="SettingsSection_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
+                <ToggleButton x:Name="GeneralSettingsTab" Content="General" Tag="General" IsChecked="True" Click="SettingsSection_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
+                <ToggleButton x:Name="TypingSettingsTab" Content="Auto Typer" Tag="Typing" Click="SettingsSection_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
                 <ToggleButton x:Name="CloudSettingsTab" Content="Cloudflare bucket" Tag="Cloud" Click="SettingsSection_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
                 <ToggleButton x:Name="HotkeysSettingsTab" Content="Hotkeys" Tag="Hotkeys" Click="SettingsSection_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
                 <ToggleButton x:Name="TranslationSettingsTab" Content="Translation" Tag="Translation" Click="SettingsSection_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
-                <ToggleButton x:Name="BackupSettingsTab" Content="Export / Import" Tag="Backup" Click="SettingsSection_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
+                <ToggleButton x:Name="SummarySettingsTab" Content="AI summary" Tag="Summary" Click="SettingsSection_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" />
             </StackPanel>
             <ScrollViewer x:Name="SettingsScroller" Grid.Row="1" Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" ViewChanged="SettingsScroller_ViewChanged">
                 <StackPanel x:Name="SettingsSections" Spacing="24" Padding="0,0,16,16">
+                    <StackPanel x:Name="GeneralSettingsSection" Spacing="16">
+                        <TextBlock Text="General" FontSize="20" FontWeight="SemiBold" />
+                        <Grid ColumnSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <ToggleSwitch x:Name="RunOnStartupToggle" Header="Run on startup" OnContent="Enabled" OffContent="Disabled" ToolTipService.ToolTip="Start Auto Typer when you sign in. Tray mode opens it in the tray." />
+                            <ToggleSwitch x:Name="MinimizeToTrayToggle" Grid.Column="1" Header="Minimize to tray" OnContent="Enabled" OffContent="Disabled" ToolTipService.ToolTip="Keep running when minimized or closed. Choose Exit in the tray menu to quit." />
+                        </Grid>
+                        <ComboBox x:Name="ThemeSelector" Header="Theme" Width="220" HorizontalAlignment="Left" SelectionChanged="ThemeSelector_SelectionChanged" AutomationProperties.Name="App theme" />
+                        <Grid ColumnSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <ComboBox x:Name="TrayClickSelector" Header="Tray click" HorizontalAlignment="Stretch" AutomationProperties.Name="Tray single click action" />
+                            <ComboBox x:Name="TrayDoubleClickSelector" Grid.Column="1" Header="Tray double-click" HorizontalAlignment="Stretch" AutomationProperties.Name="Tray double click action" />
+                        </Grid>
+                    <StackPanel x:Name="BackupSettingsSection" Spacing="16">
+                        <TextBlock Text="Export / Import" FontSize="18" FontWeight="SemiBold" />
+                        <TextBlock Text="Encrypted backups include preferences, hotkeys and all API keys." TextWrapping="Wrap" />
+                        <PasswordBox x:Name="BackupPassword" Header="Backup password (at least 8 characters)" PasswordRevealMode="Peek" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button x:Name="ExportSettingsButton" Content="Export settings" Click="ExportSettings_Click" />
+                            <Button x:Name="ImportSettingsButton" Content="Import settings" Click="ImportSettings_Click" />
+                        </StackPanel>
+                        <TextBlock Text="Exports are encrypted and include the values currently entered in Settings. Import loads the backup for review; Save applies it, and Back lets you discard it. Keep the password: it cannot be recovered." TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock x:Name="BackupStatusText" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+                    </StackPanel>
+                    </StackPanel>
+                    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
                     <StackPanel x:Name="TypingSettingsSection" Spacing="16">
                         <TextBlock Text="Auto Typer" FontSize="20" FontWeight="SemiBold" />
                         <TextBlock Text="Choose your typing pace, rhythm and delay. Configure shortcuts in Hotkeys." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -324,11 +356,7 @@
                     </Grid>
 
                     <NumberBox x:Name="ReadyDelayBox" Header="Delay (seconds)" AutomationProperties.Name="Ready delay in seconds" Width="160" HorizontalAlignment="Left" Minimum="0" Maximum="10" Value="3" SmallChange="0.5" SpinButtonPlacementMode="Inline" ValueChanged="ReadyDelayBox_ValueChanged" />
-                    <ToggleSwitch x:Name="MinimizeToTrayToggle" Header="Minimize to tray" OnContent="Enabled" OffContent="Disabled" />
-                    <TextBlock Text="Keep Auto Typer and its global hotkeys running when minimized or closed. Use Exit in the tray menu to quit."
-                               FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <ToggleSwitch x:Name="RunOnStartupToggle" Header="Run on startup" OnContent="Enabled" OffContent="Disabled" />
-                    <TextBlock Text="Start Auto Typer when you sign in to Windows. If Minimize to tray is enabled, startup opens in the tray. Keep portable copies in a permanent location." FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
 
                     </StackPanel>
                     <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
@@ -400,16 +428,14 @@
                         <TextBox x:Name="TranslationRegion" Header="Azure resource region" PlaceholderText="e.g. eastus — leave blank for a global Translator resource" />
                         <TextBlock Text="Copy the key and region from your Azure resource's Keys and Endpoint page. Regional and multi-service resources require their region; global Translator resources can leave it blank. Save to enable the translate button. Clearing the key disables it. The saved key is encrypted for your Windows account. Clicking Translate sends clipboard text to Microsoft; internet access and API quota are required." TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
-                    <StackPanel x:Name="BackupSettingsSection" Spacing="16">
-                        <TextBlock Text="Export / Import" FontSize="20" FontWeight="SemiBold" />
-                        <TextBlock Text="Back up typing preferences, all hotkeys, Cloudflare settings and keys, and Microsoft Translator settings and API key. Use the same password when importing on another PC." TextWrapping="Wrap" />
-                        <PasswordBox x:Name="BackupPassword" Header="Backup password (at least 8 characters)" PasswordRevealMode="Peek" />
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button x:Name="ExportSettingsButton" Content="Export settings" Click="ExportSettings_Click" />
-                            <Button x:Name="ImportSettingsButton" Content="Import settings" Click="ImportSettings_Click" />
-                        </StackPanel>
-                        <TextBlock Text="Exports are encrypted and include the values currently entered in Settings. Import loads the backup for review; Save applies it, and Back lets you discard it. Keep the password: it cannot be recovered." TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                        <TextBlock x:Name="BackupStatusText" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+
+                    <StackPanel x:Name="SummarySettingsSection" Spacing="16">
+                        <TextBlock Text="AI summary" FontSize="20" FontWeight="SemiBold" />
+                        <PasswordBox x:Name="GroqApiKey" Header="Primary Groq API key" PasswordRevealMode="Peek" />
+                        <PasswordBox x:Name="GroqSecondaryKey" Header="Secondary Groq API key (optional)" PasswordRevealMode="Peek" />
+                        <TextBlock Text="The secondary key is tried once if the primary reaches a quota or rate limit." TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <HyperlinkButton Content="Manage Groq API keys" NavigateUri="https://console.groq.com/keys" HorizontalAlignment="Left" />
+                        <TextBlock Text="Save a key to enable summarize icons. Clicking summarize sends the source text to Groq and shows the result in a separate expandable panel. Your key is encrypted for your Windows account and included in encrypted backups." TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
                 </StackPanel>
             </ScrollViewer>

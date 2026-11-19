@@ -25,9 +25,11 @@
     <Content Include="Assets\AutoTyper.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="audio\native\bin\x64\AutoTyperAudio.dll" Link="AutoTyperAudio.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\Audio\*.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\Speech\*.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.7.0" />
     <PackageReference Include="ZXing.Net" Version="0.16.11" />
     <PackageReference Include="NAudio.Wasapi" Version="3.3.0" />
+    <PackageReference Include="Vosk" Version="0.3.38" />
     <PackageReference Include="RapidOcrNet" Version="4.2.0" ExcludeAssets="build" />
     <Content Include="$(NuGetPackageRoot)rapidocrnet\4.2.0\models\v5\ch_*.onnx"
              Link="Assets\OCR\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
