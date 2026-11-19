@@ -7,7 +7,7 @@ on:
         default: ''
       edition:
         type: string
-        default: both
+        default: winui
 permissions:
   contents: read
 jobs:
@@ -18,8 +18,6 @@ jobs:
         include:
           - arch: x64
             runner: windows-2025
-          - arch: arm64
-            runner: windows-11-arm
     runs-on: ${{ matrix.runner }}
     env:
       DOTNET_ROLL_FORWARD: Major
@@ -40,14 +38,14 @@ jobs:
         if: inputs.edition != 'compact'
         shell: pwsh
         run: |
-          foreach ($project in @('QrDecoder.Tests', 'Screenshot.Tests', 'Ocr.Tests', 'Sharing.Tests', 'SingleInstance.Tests', 'Translation.Tests')) {
+          foreach ($project in @('QrDecoder.Tests', 'Screenshot.Tests', 'Ocr.Tests', 'Sharing.Tests', 'SingleInstance.Tests', 'Translation.Tests', 'Audio.Tests')) {
             dotnet run --project "tests/$project" -c Release -r 'win-${{ matrix.arch }}'
             if ($LASTEXITCODE -ne 0) { throw "$project failed on ${{ matrix.arch }}." }
           }
       - name: Verify architecture, installer and uninstaller
-        if: inputs.edition == 'both'
+        if: inputs.edition != 'compact'
         shell: pwsh
-        run: ./scripts/Test-Packages.ps1 -Architecture '${{ matrix.arch }}'
+        run: ./scripts/Test-Packages.ps1 -Architecture '${{ matrix.arch }}' -Edition '${{ inputs.edition }}'
       - name: Check download page
         shell: pwsh
         run: |

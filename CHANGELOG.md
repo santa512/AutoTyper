@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3 — In development (main x64)
+
+- Add a collapsible left audio panel for local microphone-to-headphones preview, with microphone and output selection, depth, body, preview volume, original-voice comparison and level meters.
+- Use pinned MIT-licensed Signalsmith Stretch/Linear for formant-preserving pitch adjustment, plus local warmth EQ, gentle compression and output limiting. No audio API key, cloud processing, recording or virtual microphone driver is used.
+- Keep preview off until explicitly started; stop capture on Stop, panel collapse or app exit. Save audio preferences locally between sessions.
+- Add DSP checks for pitch, bypass, silence, overload, stream length, processing delay and bounded buffering, plus an isolated UI layout harness.
+- Limit future release builds to the main x64 app. Existing ARM64 and Compact downloads remain at 0.2.2.
+
 ## 0.2.2 — 2026-11-18
 
 - Add native ARM64 builds for the recommended app and Compact, alongside x64. Bundle architecture-matched OCR runtime DLLs and retain offline English OCR on ARM64.

@@ -6,6 +6,8 @@ Type text into any app, capture screenshots, scan QR codes, extract English text
 
 **[Download page](https://santa512.github.io/AutoTyper/#downloads)** · [Release notes](https://github.com/santa512/AutoTyper/releases/tag/v0.2.2) · [Full guide](docs/guide.md)
 
+**In development: v0.3 for the main x64 app.** A local [voice preview panel](docs/audio-preview.md) adds natural depth and body to microphone audio in headphones. The published downloads below remain v0.2.2.
+
 ## Download
 
 | Version | CPU | Portable | Setup |

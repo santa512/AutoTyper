@@ -4,9 +4,36 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="Auto Typer">
     <Grid>
-    <Border x:Name="AppSurface" Padding="32" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    <Border x:Name="AppSurface" Padding="24" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
         <Grid>
-        <Grid x:Name="MainContent">
+        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+        <Border x:Name="AudioPanel" Width="240" Margin="0,0,20,0" Padding="16" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+            <Grid RowSpacing="12">
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                <Grid><TextBlock Text="Audio" FontSize="22" FontWeight="SemiBold" /><Button x:Name="AudioRefreshButton" HorizontalAlignment="Right" Width="30" Height="30" MinWidth="30" Padding="0" Click="AudioRefresh_Click" ToolTipService.ToolTip="Refresh audio devices" AutomationProperties.Name="Refresh audio devices"><FontIcon Glyph="&#xE72C;" FontSize="14" /></Button></Grid>
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Natural voice" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Text="A fuller, natural mic voice." FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <ComboBox x:Name="AudioMicrophone" Header="Microphone" HorizontalAlignment="Stretch" SelectionChanged="AudioDevice_SelectionChanged" AutomationProperties.Name="Microphone for voice preview" />
+                    <ComboBox x:Name="AudioHeadphones" Header="Headphones" HorizontalAlignment="Stretch" SelectionChanged="AudioDevice_SelectionChanged" AutomationProperties.Name="Headphones for voice preview" />
+                    <StackPanel Spacing="2"><Grid><TextBlock Text="Depth" /><TextBlock x:Name="AudioDepthValue" HorizontalAlignment="Right" /></Grid><Slider x:Name="AudioDepthSlider" Minimum="0" Maximum="3" Value="1" StepFrequency="0.1" ValueChanged="AudioOption_Changed" AutomationProperties.Name="Voice depth in semitones" /><TextBlock Text="Keeps your natural tone" TextWrapping="Wrap" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel>
+                    <StackPanel Spacing="2"><Grid><TextBlock Text="Body" /><TextBlock x:Name="AudioBodyValue" HorizontalAlignment="Right" /></Grid><Slider x:Name="AudioBodySlider" Minimum="0" Maximum="100" Value="45" StepFrequency="1" ValueChanged="AudioOption_Changed" AutomationProperties.Name="Voice body" /></StackPanel>
+                    <StackPanel Spacing="2"><Grid><TextBlock Text="Preview volume" /><TextBlock x:Name="AudioVolumeValue" HorizontalAlignment="Right" /></Grid><Slider x:Name="AudioVolumeSlider" Minimum="0" Maximum="100" Value="35" StepFrequency="1" ValueChanged="AudioOption_Changed" AutomationProperties.Name="Headphone preview volume" /></StackPanel>
+                    <ToggleSwitch x:Name="AudioOriginalToggle" Header="Compare" OffContent="Thicker voice" OnContent="Original voice" Toggled="AudioOriginal_Toggled" />
+                </StackPanel>
+            </ScrollViewer>
+                <StackPanel Grid.Row="2" Spacing="8">
+                    <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><TextBlock Text="Mic" FontSize="11" VerticalAlignment="Center" /><ProgressBar x:Name="AudioInputMeter" Grid.Column="1" Height="3" Minimum="0" Maximum="100" AutomationProperties.Name="Microphone level" /></Grid>
+                    <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><TextBlock Text="Out" FontSize="11" VerticalAlignment="Center" /><ProgressBar x:Name="AudioOutputMeter" Grid.Column="1" Height="3" Minimum="0" Maximum="100" AutomationProperties.Name="Preview output level" /></Grid>
+                    <Button x:Name="AudioStartButton" Content="Start preview" HorizontalAlignment="Stretch" Click="AudioStart_Click" IsEnabled="False" Style="{StaticResource AccentButtonStyle}" />
+                    <TextBlock x:Name="AudioStatus" Text="Checking audio devices…" FontSize="12" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+                    <TextBlock x:Name="AudioLatency" Visibility="Collapsed" FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Text="Headphone preview · Fully local" FontSize="11" FontWeight="SemiBold" /><TextBlock Text="Use headphones to avoid feedback. No audio is recorded or uploaded." FontSize="11" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+        <Grid x:Name="MainContent" Grid.Column="1">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
@@ -23,7 +50,7 @@
                 <TextBlock Text="Auto Typer" FontSize="30" FontWeight="SemiBold" />
                 <Border Padding="8,3" CornerRadius="5" VerticalAlignment="Center"
                         Background="{ThemeResource SubtleFillColorSecondaryBrush}">
-                    <TextBlock Text="v0.2.2" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Text="v0.3" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </Border>
             </StackPanel>
             <TextBlock
@@ -31,6 +58,7 @@
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
         </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+            <ToggleButton x:Name="AudioPanelButton" IsChecked="True" Click="AudioPanel_Click" Width="36" Height="36" MinWidth="36" Padding="0" AutomationProperties.Name="Show audio panel" ToolTipService.ToolTip="Audio headphone preview"><FontIcon Glyph="&#xE720;" FontSize="17" /></ToggleButton>
             <Button x:Name="SharingSettingsButton" Click="SharingSettings_Click" Width="36" Height="36" MinWidth="36" Padding="0" AutomationProperties.Name="Settings" ToolTipService.ToolTip="Settings">
                 <FontIcon Glyph="&#xE713;" FontSize="17" />
             </Button>
@@ -227,7 +255,7 @@
             </StackPanel>
         </Grid>
         </Grid>
-        <ContentControl x:Name="SharingPanel" Visibility="Collapsed" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+        <ContentControl x:Name="SharingPanel" Grid.Column="1" Visibility="Collapsed" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
         <Grid RowSpacing="20" ColumnSpacing="24">
             <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
             <Grid.ColumnDefinitions><ColumnDefinition Width="168" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>

@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-const project = fs.readFileSync(new URL('../AutoTyper.csproj', import.meta.url), 'utf8');
-const version = project.match(/<InformationalVersion>([^<]+)<\/InformationalVersion>/)[1];
-const tag = `v${version}`;
 const html = fs.readFileSync(new URL('../docs/index.html', import.meta.url), 'utf8');
 const script = fs.readFileSync(new URL('../docs/release.js', import.meta.url), 'utf8');
+// The public website describes the published release while the app may be ahead in development.
+const tag = script.match(/releases\/tags\/(v[\d.]+)/)?.[1];
+assert(tag, 'Published release metadata has an explicit version');
+const version = tag.slice(1);
 const readme = fs.readFileSync(new URL('../README.md', import.meta.url), 'utf8');
 const files = ['AutoTyper.exe', 'AutoTyper-arm64.exe', 'AutoTyperCompact.exe', 'AutoTyperCompact-arm64.exe',
   'AutoTyper-Setup-x64.msi', 'AutoTyper-Setup-arm64.msi', 'AutoTyperCompact-Setup-x64.msi', 'AutoTyperCompact-Setup-arm64.msi'];

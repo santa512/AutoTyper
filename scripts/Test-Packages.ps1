@@ -1,10 +1,12 @@
-param([Parameter(Mandatory)][ValidateSet('x64','arm64')][string]$Architecture)
+param([Parameter(Mandatory)][ValidateSet('x64','arm64')][string]$Architecture,
+    [ValidateSet('both','winui','compact')][string]$Edition='both')
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $assets = Join-Path $root "dist/release-$Architecture"
 $suffix = if ($Architecture -eq 'x64') { '' } else { '-arm64' }
 $machine = if ($Architecture -eq 'x64') { 0x8664 } else { 0xaa64 }
 foreach ($name in @('AutoTyper','AutoTyperCompact')) {
+    if(($name -eq 'AutoTyper' -and $Edition -eq 'compact') -or ($name -eq 'AutoTyperCompact' -and $Edition -eq 'winui')) { continue }
     $exe = Join-Path $assets "$name$suffix.exe"
     $stream = [IO.File]::OpenRead($exe)
     $reader = [IO.BinaryReader]::new($stream)
@@ -14,6 +16,10 @@ foreach ($name in @('AutoTyper','AutoTyperCompact')) {
         $stream.Position = $header
         if ($reader.ReadUInt32() -ne 0x4550 -or $reader.ReadUInt16() -ne $machine) { throw "Wrong architecture: $exe" }
     } finally { $reader.Dispose() }
+    if ($name -eq 'AutoTyper') {
+        $probe = Start-Process -FilePath $exe -ArgumentList '--audio-self-test' -Wait -PassThru -WindowStyle Hidden
+        if ($probe.ExitCode -ne 0) { throw 'Packaged local audio processor self-test failed.' }
+    }
     $msi = Join-Path $assets "$name-Setup-$Architecture.msi"
     $log = Join-Path $env:RUNNER_TEMP "$name-install.log"
     $installed = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) "Programs/$name/$name.exe"

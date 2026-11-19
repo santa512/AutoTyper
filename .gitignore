@@ -11,5 +11,7 @@ dist/
 .env.*
 !.env.example
 node_modules/
+audio/native/bin/
+audio/native/build/
 .wrangler/
 .dev.vars*

@@ -4,14 +4,14 @@
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <RootNamespace>AutoTyper</RootNamespace>
-    <Version>0.2.2</Version>
-    <InformationalVersion>0.2.2</InformationalVersion>
+    <Version>0.3.0</Version>
+    <InformationalVersion>0.3</InformationalVersion>
     <Product>Auto Typer</Product>
     <Description>Automatic typing with natural rhythm and global keyboard output.</Description>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\AutoTyper.ico</ApplicationIcon>
-    <Platforms>x64;x86;ARM64</Platforms>
-    <RuntimeIdentifiers>win-x64;win-x86;win-arm64</RuntimeIdentifiers>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <UseWinUI>true</UseWinUI>
     <EnableMsixTooling>false</EnableMsixTooling>
     <WindowsPackageType>None</WindowsPackageType>
@@ -23,8 +23,11 @@
   </PropertyGroup>
   <ItemGroup>
     <Content Include="Assets\AutoTyper.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="audio\native\bin\x64\AutoTyperAudio.dll" Link="AutoTyperAudio.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\Audio\*.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.7.0" />
     <PackageReference Include="ZXing.Net" Version="0.16.11" />
+    <PackageReference Include="NAudio.Wasapi" Version="3.3.0" />
     <PackageReference Include="RapidOcrNet" Version="4.2.0" ExcludeAssets="build" />
     <Content Include="$(NuGetPackageRoot)rapidocrnet\4.2.0\models\v5\ch_*.onnx"
              Link="Assets\OCR\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
@@ -34,4 +37,8 @@
     <Content Include="Assets\OcrRuntime\*.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\OcrRuntime\*.rtf" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+  <Target Name="BuildLocalAudio" BeforeTargets="PrepareForBuild" Inputs="@(AudioSource)" Outputs="$(MSBuildProjectDirectory)\audio\native\bin\x64\AutoTyperAudio.dll">
+    <Exec Command="pwsh -NoProfile -File &quot;$(MSBuildProjectDirectory)\scripts\Build-Audio.ps1&quot;" />
+  </Target>
+  <ItemGroup><AudioSource Include="audio\native\**\*.cpp;audio\native\vendor\**\*.h;scripts\Build-Audio.ps1" /></ItemGroup>
 </Project>

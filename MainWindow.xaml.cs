@@ -808,17 +808,21 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    public MainWindow()
+    public MainWindow() : this(TypingSettingsStore.Load() with { RunOnStartup = StartupRegistration.IsEnabled }, true) { }
+
+    internal MainWindow(TypingSettings initialSettings, bool registerHotkeys)
     {
+        _audioPersistSettings = registerHotkeys;
         _windowSubclassProc = WindowSubclassProc;
         InitializeComponent();
-        _translationSettings = TranslationSettingsStore.Load();
+        InitializeAudioPanel();
+        _translationSettings = registerHotkeys ? TranslationSettingsStore.Load() : new();
         TranslationLanguage.ItemsSource = TranslationSettings.Languages;
         TranslationLanguage.SelectedItem = _translationSettings.TargetLanguage;
-        ApplyTypingSettings(TypingSettingsStore.Load() with { RunOnStartup = StartupRegistration.IsEnabled });
-        _sharingSettings = SharingSettingsStore.Load();
+        ApplyTypingSettings(initialSettings);
+        _sharingSettings = registerHotkeys ? SharingSettingsStore.Load() : null;
         SetRegionToolsEnabled(true);
-        RegisterGlobalHotkey();
+        RegisterGlobalHotkey(registerHotkeys);
         UpdateTrayIcon();
         AppSurface.Loaded += (_, _) => UpdateTitleBarTheme();
         AppSurface.ActualThemeChanged += (_, _) => DispatcherQueue.TryEnqueue(UpdateTitleBarTheme);
@@ -1616,14 +1620,16 @@ public sealed partial class MainWindow : Window
         titleBar.ButtonPressedForegroundColor = foreground;
     }
 
-    private void RegisterGlobalHotkey()
+    private void RegisterGlobalHotkey(bool enabled = true)
     {
         _windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(this);
         Microsoft.UI.Windowing.AppWindow appWindow =
             Microsoft.UI.Windowing.AppWindow.GetFromWindowId(
                 Microsoft.UI.Win32Interop.GetWindowIdFromWindow(_windowHandle));
-        appWindow.Resize(new Windows.Graphics.SizeInt32(1000, 800));
+        appWindow.Resize(new Windows.Graphics.SizeInt32(1280, 820));
         appWindow.SetIcon(System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "AutoTyper.ico"));
+
+        if (!enabled) { RecordHotkeyButton.IsEnabled = false; return; }
 
         if (!SetWindowSubclass(
                 _windowHandle,
@@ -1779,6 +1785,7 @@ public sealed partial class MainWindow : Window
     private void MainWindow_Closed(object sender, WindowEventArgs args)
     {
         _isClosing = true;
+        StopAudioPreview();
         _trayIcon?.Dispose();
         _trayIcon = null;
         _sharingCompletion?.TrySetResult(null);

@@ -1,6 +1,6 @@
 param(
-    [Parameter(Mandatory)][ValidateSet('x64','arm64')][string]$Architecture,
-    [ValidateSet('both','winui','compact')][string]$Edition = 'both',
+    [Parameter(Mandatory)][ValidateSet('x64')][string]$Architecture,
+    [ValidateSet('both','winui','compact')][string]$Edition = 'winui',
     [string]$WixPath = '.tools/wix/wix.exe'
 )
 $ErrorActionPreference = 'Stop'
