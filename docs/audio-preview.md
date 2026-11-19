@@ -8,6 +8,8 @@ Open the left **Audio** panel, select your microphone and headphones, and click 
 - **Compare:** switches between the processed and original voice at the same preview volume and with matched buffering.
 - **Stop preview:** releases the microphone and playback devices. Collapsing the audio panel or exiting also stops it. Tray mode keeps an explicitly started preview active until stopped or exited.
 
+The panel shows **Preview off**, **Starting**, or **Live · Processed / Original**, with a green indicator and stop icon while active. Stopping preview silences Auto Typer's output; it does not stop the source video or other apps. The window has a display-scaled minimum width to keep action buttons visible, with a smaller limit when the audio panel is hidden.
+
 Audio is processed locally using Signalsmith Stretch/Linear and Windows WASAPI through NAudio. It is kept in short memory buffers; no audio is recorded, uploaded or sent to an API. No cloud service, API key, GPU, model download or virtual audio driver is required. Audio preferences are saved in `%LOCALAPPDATA%\AutoTyper\audio.json`.
 
 This version is a headphone preview. It does not replace the microphone used by calls or other apps. Device and processing buffers introduce a delay; the panel reports an estimated stream delay while running. Final sound quality depends on the microphone and voice, so compare the result at modest settings before increasing depth or body.

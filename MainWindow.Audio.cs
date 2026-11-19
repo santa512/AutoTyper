@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using NAudio.CoreAudioApi;
 using System.Runtime.InteropServices;
 
@@ -79,6 +80,7 @@ public sealed partial class MainWindow
         if(!_audioReady) return;
         _audioPreview?.Configure(CaptureAudioSettings(),AudioOriginalToggle.IsOn);
         if(_audioPreview is not null) AudioStatus.Text=AudioOriginalToggle.IsOn?"Previewing original voice":"Previewing thicker voice";
+        UpdateAudioPreviewAppearance(_audioPreview is not null,_audioStarting);
     }
     private void UpdateAudioLabels()
     {
@@ -90,8 +92,24 @@ public sealed partial class MainWindow
     {
         bool active=_audioPreview is not null;
         AudioStartButton.IsEnabled=!_audioStarting&&(active||(AudioMicrophone.SelectedItem is AudioDeviceChoice&&AudioHeadphones.SelectedItem is AudioDeviceChoice));
-        AudioStartButton.Content=active?"Stop preview":"Start preview";
+        UpdateAudioPreviewAppearance(active,_audioStarting);
         AudioMicrophone.IsEnabled=AudioHeadphones.IsEnabled=AudioRefreshButton.IsEnabled=!active&&!_audioStarting;
+    }
+    internal void UpdateAudioPreviewAppearance(bool active,bool starting=false)
+    {
+        AudioStartLabel.Text=starting?"Starting…":active?"Stop preview":"Start preview";
+        AudioStartIcon.Glyph=active?"\uE71A":"\uE768";
+        AudioStartButton.Style=(Style)Application.Current.Resources[active?"DefaultButtonStyle":"AccentButtonStyle"];
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(AudioStartButton,AudioStartLabel.Text);
+        AudioStateText.Text=starting?"Starting preview…":active
+            ?(AudioOriginalToggle.IsOn?"Live · Original":"Live · Processed"):"Preview off";
+        AudioStateDot.Fill=new SolidColorBrush(active&&!starting
+            ?Windows.UI.Color.FromArgb(255,60,180,110):Windows.UI.Color.FromArgb(255,140,140,140));
+        if(active) AudioPanel.BorderBrush=AudioStateDot.Fill;
+        else AudioPanel.ClearValue(Border.BorderBrushProperty);
+        ToolTipService.SetToolTip(AudioStartButton,active
+            ?"Stop Auto Typer's audio output. Audio playing in other apps continues."
+            :"Start monitoring the selected input through Auto Typer.");
     }
     private async void AudioStart_Click(object sender,RoutedEventArgs e)
     {
@@ -153,5 +171,11 @@ public sealed partial class MainWindow
         bool open=AudioPanelButton.IsChecked==true;
         if(!open) StopAudioPreview();
         AudioPanel.Visibility=open?Visibility.Visible:Visibility.Collapsed;
+        if(open && _windowHandle!=IntPtr.Zero)
+        {
+            var window=Microsoft.UI.Windowing.AppWindow.GetFromWindowId(Microsoft.UI.Win32Interop.GetWindowIdFromWindow(_windowHandle));
+            int minimum=(int)Math.Ceiling(1200*Math.Max(96u,GetDpiForWindow(_windowHandle))/96d);
+            if(window.Size.Width<minimum) window.Resize(new Windows.Graphics.SizeInt32(minimum,window.Size.Height));
+        }
     }
 }
