@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.2 — 2026-11-19 (main x64)
+
+- Automatically pause on focus loss and resume at the same typing progress when the original input is focused again. Check native control and accessibility identity; keep manual pause separate.
+
+
 ## 0.3.1 — 2026-11-19 (main x64)
 
 - Move the audio panel to the right, with Pin, Settings and Hamburger controls in that order. Use an icon-only pin and place live captions beside QR.

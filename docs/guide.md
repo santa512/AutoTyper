@@ -248,3 +248,6 @@ See [CHANGELOG.md](../CHANGELOG.md) for version history.
 ## Build all release packages
 
 Install WiX with `dotnet tool install --tool-path .tools/wix wix --version 6.0.2`, then run `./scripts/Build-Release.ps1 -Architecture x64` or `-Architecture arm64` from PowerShell on a matching Windows build host with .NET 10 and Visual Studio C++ tools. The scripts produce portable EXEs, per-user MSI installers and checksums under `dist/release-<architecture>`. CI uses native runners to test each architecture, including OCR and install/uninstall.
+### Automatic focus pause (v0.3.2)
+
+Typing pauses when the original input loses focus, including when you return to Auto Typer. It resumes at the same progress when that input regains focus. Manual pause still needs Resume. The input must expose Windows accessibility information. Keep its caret and contents unchanged while paused; a replaced or closed input needs a new run.
