@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing main-x64 release tag (for example v0.3.1)
+        description: Existing main-x64 release tag (for example v0.3.2)
         required: true
-        default: v0.3.1
+        default: v0.3.2
 permissions:
   contents: read
 jobs:

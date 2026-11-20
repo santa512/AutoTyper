@@ -64,6 +64,8 @@ public sealed partial class MainWindow : Window
     private bool _hasProgress;
     private int[] _sourceTextOffsets = Array.Empty<int>();
     private IntPtr _targetWindow;
+    private TypingFocusTarget? _typingFocusTarget;
+    private bool _focusPaused;
     private bool _isReadingClipboard;
     private bool _isClosing;
     private bool _isSelectingRegion;
@@ -1112,6 +1114,8 @@ public sealed partial class MainWindow : Window
         SourceBox.IsHitTestVisible = false;
         ReadyDelayBox.IsEnabled = false;
         _targetWindow = IntPtr.Zero;
+        _typingFocusTarget = null;
+        _focusPaused = false;
         RecordHotkeyButton.IsEnabled = false;
         _isRunning = true;
         SetRegionToolsEnabled(false);
@@ -1155,6 +1159,8 @@ public sealed partial class MainWindow : Window
             ReadyDelayBox.IsEnabled = true;
             RecordHotkeyButton.IsEnabled = _windowSubclassed;
             _targetWindow = IntPtr.Zero;
+        _typingFocusTarget = null;
+        _focusPaused = false;
             StartPauseButton.Content = "Start";
             StopButton.IsEnabled = false;
             UpdateProgressText();
@@ -1201,6 +1207,7 @@ public sealed partial class MainWindow : Window
     {
         await RunReadyCountdownAsync(cancellationToken);
         await WaitIfPausedAsync(cancellationToken);
+        _typingFocusTarget = TypingFocusTarget.Capture(_windowHandle);
         _targetWindow = NativeKeyboard.GetForegroundWindow();
         if (_targetWindow == IntPtr.Zero || _targetWindow == _windowHandle)
         {
@@ -1230,7 +1237,7 @@ public sealed partial class MainWindow : Window
             if (char.IsLetter(next) && _random.NextDouble() < MistakeSlider.Value)
             {
                 char typo = GetNearbyLetter(next);
-                InsertAtCaret(typo);
+                await InsertAtCaretAsync(typo, cancellationToken);
                 int typoPosition = _caret - 1;
                 int delayCharacters = _random.NextDouble() < 0.7
                     ? 1
@@ -1243,7 +1250,7 @@ public sealed partial class MainWindow : Window
             }
             else
             {
-                InsertAtCaret(next);
+                await InsertAtCaretAsync(next, cancellationToken);
                 ActivityText.Text = GetActivityFor(next);
             }
 
@@ -1338,7 +1345,7 @@ public sealed partial class MainWindow : Window
         {
             await DelayForKeyAsync(cancellationToken);
             await WaitIfPausedAsync(cancellationToken);
-            SendExternalKey(0x25); // Left arrow
+            await SendExternalKeyAsync(0x25, cancellationToken); // Left arrow
             _caret--;
         }
 
@@ -1347,21 +1354,21 @@ public sealed partial class MainWindow : Window
 
         await DelayForKeyAsync(cancellationToken);
         await WaitIfPausedAsync(cancellationToken);
-        SendExternalKey(0x08); // Backspace
+        await SendExternalKeyAsync(0x08, cancellationToken); // Backspace
         _typedLength--;
         _caret--;
         ActivityText.Text = "Backspace";
 
         await DelayForKeyAsync(cancellationToken);
         await WaitIfPausedAsync(cancellationToken);
-        InsertAtCaret(correction.CorrectCharacter);
+        await InsertAtCaretAsync(correction.CorrectCharacter, cancellationToken);
         ActivityText.Text = "Typo corrected";
 
         while (_caret < _typedLength)
         {
             await DelayForKeyAsync(cancellationToken);
             await WaitIfPausedAsync(cancellationToken);
-            SendExternalKey(0x27); // Right arrow
+            await SendExternalKeyAsync(0x27, cancellationToken); // Right arrow
             _caret++;
         }
         UpdateCurrentCharacter(_sourceIndex);
@@ -1425,6 +1432,19 @@ public sealed partial class MainWindow : Window
                 continue;
             }
 
+            if (_typingFocusTarget is not null && !_typingFocusTarget.IsFocused())
+            {
+                _focusPaused = true;
+                StatusText.Text = "Paused — return to the original text input";
+                await Task.Delay(100, cancellationToken);
+                continue;
+            }
+            if (_focusPaused)
+            {
+                _focusPaused = false;
+                StatusText.Text = "Typing";
+            }
+
             // Do not turn simulated keys into shortcuts while the hotkey is held.
             if ((GetPressedHotkeyModifiers() & ~ModNoRepeat) != 0)
             {
@@ -1436,27 +1456,18 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void InsertAtCaret(char character)
+    private async Task InsertAtCaretAsync(char character, CancellationToken cancellationToken)
     {
-        EnsureExternalTarget();
+        await WaitIfPausedAsync(cancellationToken);
         NativeKeyboard.SendCharacter(character);
         _typedLength++;
         _caret++;
     }
 
-    private void SendExternalKey(ushort virtualKey)
+    private async Task SendExternalKeyAsync(ushort virtualKey, CancellationToken cancellationToken)
     {
-        EnsureExternalTarget();
+        await WaitIfPausedAsync(cancellationToken);
         NativeKeyboard.SendKey(virtualKey);
-    }
-
-    private void EnsureExternalTarget()
-    {
-        if (_targetWindow == IntPtr.Zero
-            || NativeKeyboard.GetForegroundWindow() != _targetWindow)
-        {
-            throw new InvalidOperationException("Target app lost focus. Typing stopped; start a new run to continue.");
-        }
     }
 
     private void BuildSourceTextOffsets()
