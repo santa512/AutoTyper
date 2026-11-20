@@ -13,6 +13,7 @@ public sealed partial class MainWindow
         var window=new CaptionWindow(AppSurface.RequestedTheme,microphone?.Id??"",microphone?.Name??"the default microphone",
             ()=>_translationSettings,TranslateCaptionsAsync,()=>_summarySettings.IsConfigured,RequestSummaryAsync);
         _captionWindow=window;
+        window.ApplyCaptureProtection(_hideFromScreenCapture);
         window.Closed+=(_,_)=> { if(ReferenceEquals(_captionWindow,window)) _captionWindow=null; };
         window.Activate();
     }

@@ -7,6 +7,24 @@ public sealed partial class MainWindow
 {
     private string _themeChoice = "System", _trayClickAction = "Main", _trayDoubleClickAction = "Main";
     private bool _generalSettingsReady;
+    private bool _hideFromScreenCapture;
+    private void HideFromScreenCapture_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_generalSettingsReady) ApplyCaptureProtection(HideFromScreenCaptureToggle.IsOn);
+    }
+    private void ApplyCaptureProtection(bool? preview = null)
+    {
+        if (_windowHandle == IntPtr.Zero) return;
+        bool enabled = preview ?? _hideFromScreenCapture;
+        string? error = CaptureProtection.Apply(_windowHandle, enabled);
+        if (_captionWindow is not null)
+        {
+            string? captionError = _captionWindow.ApplyCaptureProtection(enabled);
+            error ??= captionError;
+        }
+        CaptureProtectionStatus.Text = error ?? (enabled ? "Windows capture exclusion is active. Save to remember this setting." : "");
+        CaptureProtectionStatus.Visibility = error is null && !enabled ? Visibility.Collapsed : Visibility.Visible;
+    }
     private void InitializeGeneralSettings()
     {
         ThemeSelector.ItemsSource = GeneralPreferenceOptions.Themes;
@@ -18,6 +36,7 @@ public sealed partial class MainWindow
     {
         MinimizeToTrayToggle.IsOn = settings.MinimizeToTray;
         RunOnStartupToggle.IsOn = settings.RunOnStartup;
+        HideFromScreenCaptureToggle.IsOn = settings.HideFromScreenCapture;
         ThemeSelector.SelectedItem = settings.Theme;
         TrayClickSelector.SelectedItem = GeneralPreferenceOptions.TrayActions.First(choice => choice.Id == settings.TrayClickAction);
         TrayDoubleClickSelector.SelectedItem = GeneralPreferenceOptions.TrayActions.First(choice => choice.Id == settings.TrayDoubleClickAction);

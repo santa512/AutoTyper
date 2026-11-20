@@ -1,6 +1,6 @@
 // Direct links and static sizes remain usable without this enhancement.
 for (const [tag, names] of [
-  ['v0.3', ['AutoTyper.exe']],
+  ['v0.3.1', ['AutoTyper.exe']],
   ['v0.2.2', ['AutoTyperCompact.exe']]
 ]) {
   fetch(`https://api.github.com/repos/santa512/AutoTyper/releases/tags/${tag}`, {

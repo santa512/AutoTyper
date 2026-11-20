@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.1 — 2026-11-19 (main x64)
+
+- Move the audio panel to the right, with Pin, Settings and Hamburger controls in that order. Use an icon-only pin and place live captions beside QR.
+- Shrink the window when audio is collapsed, enforce a minimum height, align text controls and fix clipped Settings fields.
+- Omit the System prefix on new system-only caption lines when microphone input is disabled.
+- Add General → Hide from screen capture for the main window and live captions. It applies immediately, verifies the Windows flag, and Save remembers the choice. Requires Windows 10 version 2004 or later; capture-tool compatibility varies.
+- Import encrypted settings by selecting the backup first, then entering that backup's password in a separate inline prompt. Wrong passwords can be retried. Passwords are not stored in plaintext or saved locally. Existing backups remain compatible.
+
+
+
 ## 0.3 — 2026-11-19 (main x64)
 
 - Add Groq summary icons next to Translate in the main input and caption overlay. Show summaries in separate expandable panels while preserving input and ongoing captions; support encrypted primary/secondary keys with bounded quota failover.

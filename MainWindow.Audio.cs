@@ -171,11 +171,13 @@ public sealed partial class MainWindow
         bool open=AudioPanelButton.IsChecked==true;
         if(!open) StopAudioPreview();
         AudioPanel.Visibility=open?Visibility.Visible:Visibility.Collapsed;
-        if(open && _windowHandle!=IntPtr.Zero)
+        if(_windowHandle!=IntPtr.Zero)
         {
             var window=Microsoft.UI.Windowing.AppWindow.GetFromWindowId(Microsoft.UI.Win32Interop.GetWindowIdFromWindow(_windowHandle));
-            int minimum=(int)Math.Ceiling(1200*Math.Max(96u,GetDpiForWindow(_windowHandle))/96d);
-            if(window.Size.Width<minimum) window.Resize(new Windows.Graphics.SizeInt32(minimum,window.Size.Height));
+            double scale=Math.Max(96u,GetDpiForWindow(_windowHandle))/96d;
+            int minimum=(int)Math.Ceiling((open?1200:940)*scale);
+            int width=Math.Max(minimum,window.Size.Width+(int)Math.Round((open?260:-260)*scale));
+            window.Resize(new Windows.Graphics.SizeInt32(width,window.Size.Height));
         }
     }
 }

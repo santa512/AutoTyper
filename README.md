@@ -1,18 +1,18 @@
 # Auto Typer
 
-**v0.3 · Windows 10/11 · x64 · Portable & Setup**
+**v0.3.1 · Windows 10/11 · x64 · Portable & Setup**
 
 Type text into any app, capture screenshots, scan QR codes, extract English text offline, and translate clipboard text.
 
-**[Download page](https://santa512.github.io/AutoTyper/#downloads)** · [Release notes](https://github.com/santa512/AutoTyper/releases/tag/v0.3) · [Full guide](docs/guide.md)
+**[Download page](https://santa512.github.io/AutoTyper/#downloads)** · [Release notes](https://github.com/santa512/AutoTyper/releases/tag/v0.3.1) · [Full guide](docs/guide.md)
 
-**New in v0.3:** Local [voice preview](docs/audio-preview.md), [live captions](docs/live-captions.md), [Groq summaries](docs/ai-summary.md), and [General settings](docs/general-settings.md). ARM64 and Compact remain on v0.2.2.
+**v0.3.1:** capture exclusion, a clearer backup import flow and layout fixes. Includes Local [voice preview](docs/audio-preview.md), [live captions](docs/live-captions.md), [Groq summaries](docs/ai-summary.md), and [General settings](docs/general-settings.md). ARM64 and Compact remain on v0.2.2.
 
 ## Download
 
 | Version | CPU | Portable | Setup |
 | --- | --- | --- | --- |
-| **Auto Typer v0.3** | x64 | [EXE](https://github.com/santa512/AutoTyper/releases/download/v0.3/AutoTyper.exe) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.3/AutoTyper.exe.sha256) | [MSI](https://github.com/santa512/AutoTyper/releases/download/v0.3/AutoTyper-Setup-x64.msi) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.3/AutoTyper-Setup-x64.msi.sha256) |
+| **Auto Typer v0.3.1** | x64 | [EXE](https://github.com/santa512/AutoTyper/releases/download/v0.3.1/AutoTyper.exe) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.3.1/AutoTyper.exe.sha256) | [MSI](https://github.com/santa512/AutoTyper/releases/download/v0.3.1/AutoTyper-Setup-x64.msi) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.3.1/AutoTyper-Setup-x64.msi.sha256) |
 | **Auto Typer v0.2.2** | ARM64 | [EXE](https://github.com/santa512/AutoTyper/releases/download/v0.2.2/AutoTyper-arm64.exe) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.2.2/AutoTyper-arm64.exe.sha256) | [MSI](https://github.com/santa512/AutoTyper/releases/download/v0.2.2/AutoTyper-Setup-arm64.msi) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.2.2/AutoTyper-Setup-arm64.msi.sha256) |
 | **Compact v0.2.2** | x64 | [EXE](https://github.com/santa512/AutoTyper/releases/download/v0.2.2/AutoTyperCompact.exe) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.2.2/AutoTyperCompact.exe.sha256) | [MSI](https://github.com/santa512/AutoTyper/releases/download/v0.2.2/AutoTyperCompact-Setup-x64.msi) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.2.2/AutoTyperCompact-Setup-x64.msi.sha256) |
 | **Compact v0.2.2** | ARM64 | [EXE](https://github.com/santa512/AutoTyper/releases/download/v0.2.2/AutoTyperCompact-arm64.exe) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.2.2/AutoTyperCompact-arm64.exe.sha256) | [MSI](https://github.com/santa512/AutoTyper/releases/download/v0.2.2/AutoTyperCompact-Setup-arm64.msi) · [SHA-256](https://github.com/santa512/AutoTyper/releases/download/v0.2.2/AutoTyperCompact-Setup-arm64.msi.sha256) |
@@ -40,7 +40,8 @@ The input highlights your current character. Switching to another foreground win
 - **Audio and captions:** local headphone voice preview and English system-audio captions, with optional labeled microphone input.
 - **AI summaries:** expandable Groq panels preserve your input and captions; primary and backup keys are supported.
 - **General settings:** theme, startup, tray click actions and encrypted backups.
-- **Settings backups:** export/import preferences and all API keys using a password-encrypted backup. Imported settings apply when you press **Save**.
+- **Capture privacy:** hide the main window and captions from supported capture tools in General settings.
+- **Settings backups:** export/import preferences and all API keys using a password-encrypted backup. Select the backup first, enter its password, then review and **Save**.
 
 Sharing, translation and summaries require your own API settings and stay disabled until configured. QR scanning and English OCR run locally. [Setup and troubleshooting →](docs/guide.md)
 
