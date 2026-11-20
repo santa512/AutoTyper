@@ -65,6 +65,12 @@ public sealed partial class CaptionWindow : Window
         Closed+=(_,_)=> { _closing=true;_lifetime.Cancel();_startup?.Cancel();_ = StopAsync(); };
         UpdateControls();
     }
+    internal string? ApplyCaptureProtection(bool enabled)
+    {
+        string? error = CaptureProtection.Apply(WinRT.Interop.WindowNative.GetWindowHandle(this), enabled);
+        if (error is not null) SetStatus(error);
+        return error;
+    }
     internal void ApplyRequestedTheme(ElementTheme theme) => CaptionSurface.RequestedTheme=theme;
     private void ApplyTheme()
     {
@@ -148,6 +154,7 @@ public sealed partial class CaptionWindow : Window
         }
         finally { _starting=false;_startup.Dispose();_startup=null;UpdateControls(); }
     }
+    private string FormatCaption(string source,string text)=>IncludeMicrophone.IsChecked==true||source!="System"?$"[{source}] {text}":text;
     private void ReceiveText(string source,string text,bool final)
     {
         if(final)
@@ -157,14 +164,14 @@ public sealed partial class CaptionWindow : Window
             {
                 _transcript.Add(source,text);
                 _summaryBuffer.Add(source,text);
-                string line=$"[{source}] {text}";
+                string line=FormatCaption(source,text);
                 _display.Enqueue(line);_displayCharacters+=line.Length;
                 while(_displayCharacters>12000&&_display.Count>1) _displayCharacters-=_display.Dequeue().Length;
                 FinalCaptions.Text=string.Join(Environment.NewLine+Environment.NewLine,_display);
             }
         }
         else _partial[source]=text;
-        PartialCaptions.Text=string.Join(Environment.NewLine,_partial.Where(p=>!string.IsNullOrWhiteSpace(p.Value)).Select(p=>$"[{p.Key}] {p.Value}"));
+        PartialCaptions.Text=string.Join(Environment.NewLine,_partial.Where(p=>!string.IsNullOrWhiteSpace(p.Value)).Select(p=>FormatCaption(p.Key,p.Value)));
         CaptionScroll.ChangeView(null,CaptionScroll.ScrollableHeight,null,true);
         UpdateControls();
     }

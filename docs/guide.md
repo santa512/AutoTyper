@@ -71,7 +71,7 @@ Run `dotnet run --project tests/Translation.Tests -c Release` to check request c
 
 Open **Settings → General → Export / Import** and enter a backup password of at least eight characters. **Export settings** saves an encrypted `.autotyper` file containing the current typing settings, all six hotkeys, Cloudflare configuration and both R2 keys, Microsoft Translator configuration and API key, and both Groq keys. The backup can be imported on another PC using the same password. It uses AES-256-GCM encryption with a password-derived key; the password is not stored and cannot be recovered.
 
-**Import settings** loads the backup into Settings for review. **Save** applies and persists imported values, checking hotkey availability on this PC. **Back → No** discards the import. Wrong passwords and damaged files leave settings unchanged. Backups contain configuration; input text and shared URL history are not included.
+**Import settings** first opens the file picker, then asks for that backup’s password in an inline prompt. Choose **Unlock and import** to load it into Settings for review. **Save** applies and persists imported values, checking hotkey availability on this PC. **Back → No** discards the import. Wrong passwords and damaged files leave settings unchanged. Backups contain configuration; input text and shared URL history are not included.
 
 ## One running instance
 

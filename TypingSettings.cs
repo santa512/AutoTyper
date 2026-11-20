@@ -10,6 +10,7 @@ internal sealed record TypingSettings
     public double DelaySeconds { get; init; } = 3;
     public bool MinimizeToTray { get; init; }
     public bool RunOnStartup { get; init; }
+    public bool HideFromScreenCapture { get; init; }
     public string Theme { get; init; } = "System";
     public string TrayClickAction { get; init; } = "Main";
     public string TrayDoubleClickAction { get; init; } = "Main";

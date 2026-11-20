@@ -385,6 +385,8 @@ public sealed partial class MainWindow : Window
             EndHotkeyRecording();
             if (!_isClosing) RegisterActiveHotkeys();
             SharingPanel.Visibility = Visibility.Collapsed;
+            CancelImportPassword_Click(this, new RoutedEventArgs());
+            BackupPassword.Password = "";
             MainContent.Visibility = Visibility.Visible;
             SharingAccessKey.Password = SharingSecretKey.Password = "";
             TranslationApiKey.Password = "";
@@ -505,7 +507,7 @@ public sealed partial class MainWindow : Window
             byte[] data = await Task.Run(() => SettingsBackup.Export(bundle, password));
             if (_isClosing) return;
             await File.WriteAllBytesAsync(file.Path, data);
-            if (!_isClosing) BackupStatusText.Text = "Settings exported with all configured keys. Keep the backup password.";
+            if (!_isClosing) { BackupPassword.Password = ""; BackupStatusText.Text = "Settings exported with all configured keys. Keep the backup password."; }
         }
         catch (Exception exception) when (exception is InvalidOperationException or IOException or UnauthorizedAccessException or COMException)
         {
@@ -515,13 +517,19 @@ public sealed partial class MainWindow : Window
         finally { if (!_isClosing) SharingPanel.IsEnabled = true; }
     }
 
+    private byte[]? _pendingImportData;
+    private void CancelImportPassword_Click(object sender, RoutedEventArgs e)
+    {
+        _pendingImportData = null;
+        ImportBackupPassword.Password = "";
+        ImportPasswordPanel.Visibility = Visibility.Collapsed;
+    }
     private async void ImportSettings_Click(object sender, RoutedEventArgs e)
     {
         if (_sharingCompletion is null || _isClosing) return;
+        CancelImportPassword_Click(sender, e);
         try
         {
-            string password = BackupPassword.Password;
-            SettingsBackup.ValidatePassword(password);
             SharingPanel.IsEnabled = false;
             var picker = new Microsoft.Windows.Storage.Pickers.FileOpenPicker(AppWindow.Id);
             picker.FileTypeFilter.Add(".autotyper");
@@ -530,9 +538,37 @@ public sealed partial class MainWindow : Window
             if (file is null) { BackupStatusText.Text = "Import cancelled."; return; }
             if (new FileInfo(file.Path).Length > SettingsBackup.MaximumFileBytes)
                 throw new InvalidOperationException("The settings backup is too large.");
-            byte[] data = await File.ReadAllBytesAsync(file.Path);
+            _pendingImportData = await File.ReadAllBytesAsync(file.Path);
+            if (_isClosing) return;
+            ImportBackupPassword.Header = "Password for " + Path.GetFileName(file.Path);
+            ImportPasswordPanel.Visibility = Visibility.Visible;
+            BackupStatusText.Text = "Enter the password used when this backup was exported.";
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or IOException or UnauthorizedAccessException or COMException)
+        {
+            BackupStatusText.Text = exception is InvalidOperationException ? exception.Message : "Could not open the backup file.";
+        }
+        finally
+        {
+            if (!_isClosing)
+            {
+                SharingPanel.IsEnabled = true;
+                if (_pendingImportData is not null) ImportBackupPassword.Focus(FocusState.Programmatic);
+            }
+        }
+    }
+    private async void UnlockImport_Click(object sender, RoutedEventArgs e)
+    {
+        if (_pendingImportData is null || _sharingCompletion is null || _isClosing) return;
+        try
+        {
+            byte[] data = _pendingImportData;
+            string password = ImportBackupPassword.Password;
+            SettingsBackup.ValidatePassword(password);
+            SharingPanel.IsEnabled = false;
             SettingsBundle bundle = await Task.Run(() => SettingsBackup.Import(data, password));
             if (_isClosing) return;
+            CancelImportPassword_Click(sender, e);
             var typing = bundle.Typing;
             PaceSlider.Value = typing.Pace;
             RhythmSlider.Value = typing.Rhythm;
@@ -592,6 +628,7 @@ public sealed partial class MainWindow : Window
             Pace = PaceSlider.Value, Rhythm = RhythmSlider.Value, MistakeChance = MistakeSlider.Value,
             MinimizeToTray = MinimizeToTrayToggle.IsOn,
             RunOnStartup = RunOnStartupToggle.IsOn,
+            HideFromScreenCapture = useDraft ? HideFromScreenCaptureToggle.IsOn : _hideFromScreenCapture,
             Theme = useDraft ? ThemeSelector.SelectedItem as string ?? "System" : _themeChoice,
             TrayClickAction = useDraft ? (TrayClickSelector.SelectedItem as TrayActionChoice)?.Id ?? "Main" : _trayClickAction,
             TrayDoubleClickAction = useDraft ? (TrayDoubleClickSelector.SelectedItem as TrayActionChoice)?.Id ?? "Main" : _trayDoubleClickAction,
@@ -609,6 +646,8 @@ public sealed partial class MainWindow : Window
         MistakeSlider.Value = settings.MistakeChance;
         ReadyDelayBox.Value = settings.DelaySeconds;
         _minimizeToTray = settings.MinimizeToTray;
+        _hideFromScreenCapture = settings.HideFromScreenCapture;
+        ApplyCaptureProtection();
         _themeChoice = settings.Theme;
         _trayClickAction = settings.TrayClickAction;
         _trayDoubleClickAction = settings.TrayDoubleClickAction;
@@ -1127,7 +1166,7 @@ public sealed partial class MainWindow : Window
         if (AppWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter)
         {
             presenter.IsAlwaysOnTop = PinButton.IsChecked == true;
-            PinButtonText.Text = presenter.IsAlwaysOnTop ? "Pinned on top" : "Pin on top";
+            ToolTipService.SetToolTip(PinButton, presenter.IsAlwaysOnTop ? "Unpin window" : "Keep window on top");
         }
     }
 
@@ -1670,6 +1709,7 @@ public sealed partial class MainWindow : Window
     private void RegisterGlobalHotkey(bool enabled = true)
     {
         _windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        ApplyCaptureProtection();
         Microsoft.UI.Windowing.AppWindow appWindow =
             Microsoft.UI.Windowing.AppWindow.GetFromWindowId(
                 Microsoft.UI.Win32Interop.GetWindowIdFromWindow(_windowHandle));
@@ -1801,6 +1841,7 @@ public sealed partial class MainWindow : Window
             double scale = Math.Max(96u, GetDpiForWindow(hWnd)) / 96d;
             int minimumWidth = AudioPanel.Visibility == Visibility.Visible ? 1200 : 940;
             limits.MinimumTrack.X = Math.Max(limits.MinimumTrack.X, (int)Math.Ceiling(minimumWidth * scale));
+            limits.MinimumTrack.Y = Math.Max(limits.MinimumTrack.Y, (int)Math.Ceiling(600 * scale));
             Marshal.StructureToPtr(limits, lParam, false);
             return result;
         }
