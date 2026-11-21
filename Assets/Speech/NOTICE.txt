@@ -3,7 +3,7 @@ whisper.cpp and ggml (MIT License, see Whisper-LICENSE.txt).
 https://github.com/sandrohanea/whisper.net
 https://github.com/ggml-org/whisper.cpp
 
-The ggml-small.en-q5_1.bin model is downloaded on first use from the official
+The ggml-base.en-q5_1.bin model is downloaded on first use from the official
 whisper.cpp model repository on Hugging Face and verified by SHA-256. It is a
 converted OpenAI Whisper model (MIT License).
 https://huggingface.co/ggerganov/whisper.cpp

@@ -20,7 +20,8 @@ internal sealed class WhisperCaptionEngine : IDisposable
     private readonly WhisperFactory _factory;
     internal SemaphoreSlim Gate { get; }=new(1,1);
     internal WhisperProcessor Preview { get; }
-    internal static int Threads=>Math.Clamp(Environment.ProcessorCount/2,2,8);
+    // Decodes are serialized by Gate, so one decode may use most of the CPU.
+    internal static int Threads=>Math.Clamp(Environment.ProcessorCount-1,1,8);
     internal static void ConfigureRuntime()
     {
         // Only the CPU runtime ships with the app; skip probing for CUDA/Vulkan builds.
@@ -46,6 +47,7 @@ internal sealed partial class WhisperCaptionRecognizer : ICaptionRecognizer
     private const int MinimumSamples=CaptionSegmenter.SampleRate*6/5;    // whisper.cpp ignores input under 1 s
     private const int MergeLimit=CaptionSegmenter.SampleRate*28;         // one 30 s Whisper window
     private const int PreviewStep=CaptionSegmenter.SampleRate;           // refresh previews every 1 s of new speech
+    private static readonly TimeSpan PreviewLimit=TimeSpan.FromSeconds(4);  // CPUs this slow skip previews entirely
     internal const string Listening="…";
     private readonly WhisperCaptionEngine _engine;
     private readonly WhisperProcessor _final;
@@ -62,6 +64,7 @@ internal sealed partial class WhisperCaptionRecognizer : ICaptionRecognizer
     private long _queued,_published;
     private int _previewGeneration=-1,_previewSamples;
     private bool _completing,_showingPartial;
+    private TimeSpan _lastDecode;
 
     internal WhisperCaptionRecognizer(WhisperCaptionEngine engine,Action<string,bool> emit,Action<Exception> fail)
     {
@@ -100,14 +103,20 @@ internal sealed partial class WhisperCaptionRecognizer : ICaptionRecognizer
     {
         if(_showingPartial&&!_segmenter.Active&&_published==_queued) { _showingPartial=false;_emit("",false); }
     }
+    // Stopping (closing the window or switching mode) must be quick: drop audio not yet decoded
+    // and cancel the decode in flight instead of waiting for a backlog to drain.
     public async Task CompleteAsync()
     {
-        var flushed=FlushAsync();
-        lock(_sync) _completing=true;
-        _signal.Release();
-        await Task.WhenAny(flushed,_worker);
+        lock(_sync)
+        {
+            _completing=true;_ready.Clear();_segmenter.Cut();
+            _published=_queued;
+            foreach(var (_,done) in _waiters) done.TrySetResult(true);
+            _waiters.Clear();
+            if(_showingPartial) { _showingPartial=false;_emit("",false); }
+        }
         _stop.Cancel();_signal.Release();
-        await _worker;
+        try { await _worker; } catch(OperationCanceledException) { }
     }
     private async Task RunAsync()
     {
@@ -132,8 +141,8 @@ internal sealed partial class WhisperCaptionRecognizer : ICaptionRecognizer
                             }
                             count=parts.Count;final=Join(parts);
                         }
-                        else if(!_completing&&_segmenter.ChunkSamples>=PreviewStep
-                            &&(_segmenter.Generation!=_previewGeneration||_segmenter.ChunkSamples-_previewSamples>=PreviewStep)
+                        else if(!_completing&&_lastDecode<=PreviewLimit&&_segmenter.ChunkSamples>=PreviewStep
+                            &&(_segmenter.Generation!=_previewGeneration||_segmenter.ChunkSamples-_previewSamples>=PreviewInterval)
                             &&_segmenter.Snapshot() is { } snapshot)
                         {
                             preview=snapshot;generation=_segmenter.Generation;
@@ -145,6 +154,7 @@ internal sealed partial class WhisperCaptionRecognizer : ICaptionRecognizer
                         string text=await TranscribeAsync(_final,final);
                         lock(_sync)
                         {
+                            if(_completing) break;
                             _published+=count;_showingPartial=_segmenter.Active;
                             _previewGeneration=-1;_previewSamples=0;
                             _emit(text,true);
@@ -176,13 +186,18 @@ internal sealed partial class WhisperCaptionRecognizer : ICaptionRecognizer
             }
         }
     }
+    // Refresh previews no faster than every 1 s of speech, and slower on slow CPUs so previews
+    // never take more than about half the decoder's time.
+    private int PreviewInterval=>Math.Max(PreviewStep,(int)(_lastDecode.TotalSeconds*2*CaptionSegmenter.SampleRate));
     private async Task<string> TranscribeAsync(WhisperProcessor processor,float[] samples)
     {
         if(samples.Length<MinimumSamples) Array.Resize(ref samples,MinimumSamples);
         var parts=new List<string>();
-        await _engine.Gate.WaitAsync();
-        try { await foreach(var segment in processor.ProcessAsync(samples)) parts.Add(segment.Text); }
+        await _engine.Gate.WaitAsync(_stop.Token);
+        var watch=System.Diagnostics.Stopwatch.StartNew();
+        try { await foreach(var segment in processor.ProcessAsync(samples,_stop.Token)) parts.Add(segment.Text); }
         finally { _engine.Gate.Release(); }
+        _lastDecode=watch.Elapsed;
         return Clean(string.Join(" ",parts));
     }
     private static float[] Join(List<float[]> parts)

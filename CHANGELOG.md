@@ -2,7 +2,7 @@
 
 ## 0.3.3 — 2026-11-21 (main x64)
 
-- Add an Accurate caption mode, now the default, using local Whisper `small.en` (about 190 MB, downloaded and SHA-256 verified on first use). Captions are punctuated and far more accurate; speech is split at natural pauses, with a live "…" preview while someone talks. Fast mode keeps the previous Vosk engine. Both run offline on this PC.
+- Add an Accurate caption mode, now the default, using local Whisper `base.en` (about 60 MB, downloaded and SHA-256 verified on first use). Captions are punctuated and far more accurate; speech is split at natural pauses, with a live "…" preview while someone talks. Fast mode keeps the previous Vosk engine. Both run offline on this PC.
 
 ## 0.3.2 — 2026-11-19 (main x64)
 
