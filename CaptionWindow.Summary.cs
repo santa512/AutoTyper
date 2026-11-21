@@ -20,7 +20,7 @@ public sealed partial class CaptionWindow
     private async void Summarize_Click(object sender,RoutedEventArgs e)
     {
         if(_closing||_summarizing||!_summaryConfigured()) return;
-        var snapshot=_summaryBuffer.Snapshot(_partial);
+        var snapshot=_summaryBuffer.Snapshot(_partial.Select(p=>KeyValuePair.Create(p.Key,SpokenText(p.Value))));
         if(string.IsNullOrWhiteSpace(snapshot.Text)) return;
         _summarizing=true;_summaryCancellation=CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         CancellationToken token=_summaryCancellation.Token;

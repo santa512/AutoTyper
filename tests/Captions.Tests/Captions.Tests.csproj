@@ -4,11 +4,15 @@
     <Compile Include="../../CaptionTranscript.cs" Link="CaptionTranscript.cs" />
     <Compile Include="../../CaptionModel.cs" Link="CaptionModel.cs" />
     <Compile Include="../../CaptionSession.cs" Link="CaptionSession.cs" />
+    <Compile Include="../../CaptionSegmenter.cs" Link="CaptionSegmenter.cs" />
+    <Compile Include="../../WhisperCaptions.cs" Link="WhisperCaptions.cs" />
     <Compile Include="../../CaptionSpeechRuntime.cs" Link="CaptionSpeechRuntime.cs" />
     <Compile Include="../../MicrosoftTranslator.cs" Link="MicrosoftTranslator.cs" />
     <Compile Include="../../TranslationSettings.cs" Link="TranslationSettings.cs" />
     <Compile Include="../../SharingSettings.cs" Link="SharingSettings.cs" />
     <PackageReference Include="NAudio.Wasapi" Version="3.3.0" />
     <PackageReference Include="Vosk" Version="0.3.38" />
+    <PackageReference Include="Whisper.net" Version="1.9.1" />
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
   </ItemGroup>
 </Project>

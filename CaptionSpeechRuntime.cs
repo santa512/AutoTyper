@@ -16,4 +16,12 @@ internal static class CaptionSpeechRuntime
         return true;
     });
     internal static void EnsureAvailable()=>_=Loaded.Value;
+    private static readonly Lazy<bool> WhisperLoaded=new(()=>
+    {
+        WhisperCaptionEngine.ConfigureRuntime();
+        // Loads whisper.dll and its ggml dependencies from runtimes\win-x64 without needing a model.
+        if(string.IsNullOrEmpty(Whisper.net.WhisperFactory.GetRuntimeInfo())) throw new DllNotFoundException("The accurate speech engine did not load.");
+        return true;
+    });
+    internal static void EnsureWhisperAvailable()=>_=WhisperLoaded.Value;
 }

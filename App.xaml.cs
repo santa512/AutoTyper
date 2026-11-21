@@ -17,7 +17,7 @@ public partial class App : Application
     {
         if (Environment.GetCommandLineArgs().Contains("--caption-self-test"))
         {
-            try { CaptionSpeechRuntime.EnsureAvailable(); Environment.ExitCode=0; }
+            try { CaptionSpeechRuntime.EnsureAvailable(); CaptionSpeechRuntime.EnsureWhisperAvailable(); Environment.ExitCode=0; }
             catch { Environment.ExitCode=1; }
             Exit(); return;
         }

@@ -7,22 +7,37 @@ namespace AutoTyper;
 
 internal sealed class CaptionSession : IAsyncDisposable
 {
-    private readonly Vosk.Model _model;
+    private readonly IDisposable _model;
     private readonly List<CaptionTrack> _tracks=[];
     private int _disposed;
     internal event Action<string,string,bool>? Text;
     internal event Action<Exception>? Failed;
     internal CaptionSession(string modelPath,bool includeMicrophone,string microphoneId)
+        :this(CaptionEngine.Fast,modelPath,includeMicrophone,microphoneId) { }
+    internal CaptionSession(CaptionEngine engine,string modelPath,bool includeMicrophone,string microphoneId)
     {
-        CaptionSpeechRuntime.EnsureAvailable();
-        try { _model=new Vosk.Model(modelPath); }
-        catch(Exception e) { throw new InvalidOperationException("Could not load the local English model. Check its files and try again.",e); }
+        Func<Action<string,bool>,Action<Exception>,ICaptionRecognizer> recognizer;
+        if(engine==CaptionEngine.Accurate)
+        {
+            WhisperCaptionEngine whisper;
+            try { whisper=new WhisperCaptionEngine(modelPath); }
+            catch(Exception e) { throw new InvalidOperationException("Could not load the accurate caption model or speech engine. Retry, or switch captions to Fast.",e); }
+            _model=whisper;recognizer=(emit,fail)=>new WhisperCaptionRecognizer(whisper,emit,fail);
+        }
+        else
+        {
+            CaptionSpeechRuntime.EnsureAvailable();
+            Vosk.Model vosk;
+            try { vosk=new Vosk.Model(modelPath); }
+            catch(Exception e) { throw new InvalidOperationException("Could not load the local English model. Check its files and try again.",e); }
+            _model=vosk;recognizer=(emit,_)=>new VoskCaptionRecognizer(vosk,emit);
+        }
         try
         {
             using var devices=new MMDeviceEnumerator();
-            _tracks.Add(new CaptionTrack(_model,devices.GetDefaultAudioEndpoint(DataFlow.Render,Role.Multimedia),"System",true));
+            _tracks.Add(new CaptionTrack(recognizer,devices.GetDefaultAudioEndpoint(DataFlow.Render,Role.Multimedia),"System",true));
             if(includeMicrophone)
-                _tracks.Add(new CaptionTrack(_model,string.IsNullOrEmpty(microphoneId)
+                _tracks.Add(new CaptionTrack(recognizer,string.IsNullOrEmpty(microphoneId)
                     ?devices.GetDefaultAudioEndpoint(DataFlow.Capture,Role.Communications):devices.GetDevice(microphoneId),"Mic",false));
             foreach(var track in _tracks)
             {
@@ -45,11 +60,11 @@ internal sealed class CaptionSession : IAsyncDisposable
 internal sealed class CaptionTrack : IAsyncDisposable
 {
     private sealed record Packet(byte[]? Data,TaskCompletionSource<bool>? Flush=null);
-    private readonly Channel<Packet> _queue=Channel.CreateBounded<Packet>(new BoundedChannelOptions(64)
+    private readonly Channel<Packet> _queue=Channel.CreateBounded<Packet>(new BoundedChannelOptions(256)
         { SingleReader=true,SingleWriter=false,FullMode=BoundedChannelFullMode.Wait });
     private readonly MMDevice _device;
     private readonly WasapiRecorder _recorder;
-    private readonly Vosk.Model _model;
+    private readonly Func<Action<string,bool>,Action<Exception>,ICaptionRecognizer> _createRecognizer;
     private readonly string _source;
     private readonly Task _worker;
     private readonly TaskCompletionSource<bool> _ready=new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -59,9 +74,9 @@ internal sealed class CaptionTrack : IAsyncDisposable
     private int _disposed,_failed;
     internal event Action<string,string,bool>? Text;
     internal event Action<Exception>? Failed;
-    internal CaptionTrack(Vosk.Model model,MMDevice device,string source,bool loopback)
+    internal CaptionTrack(Func<Action<string,bool>,Action<Exception>,ICaptionRecognizer> createRecognizer,MMDevice device,string source,bool loopback)
     {
-        _model=model;_device=device;_source=source;
+        _createRecognizer=createRecognizer;_device=device;_source=source;
         try
         {
             var builder=new WasapiRecorderBuilder().WithDevice(device).WithFormat(new WaveFormat(16000,16,1))
@@ -120,41 +135,22 @@ internal sealed class CaptionTrack : IAsyncDisposable
     }
     private async Task ProcessAsync()
     {
-        Vosk.VoskRecognizer? recognizer=null; long samples=0; string partial="";
+        ICaptionRecognizer? recognizer=null;
         try
         {
-            recognizer=new Vosk.VoskRecognizer(_model,16000f);
+            recognizer=_createRecognizer((text,final)=>Text?.Invoke(_source,text,final),Fail);
             _ready.TrySetResult(true);
             await foreach(var packet in _queue.Reader.ReadAllAsync())
             {
                 if(packet.Flush is { } flush)
                 {
-                    try { FinalizeSegment();flush.TrySetResult(true); }
+                    try { await recognizer.FlushAsync();flush.TrySetResult(true); }
                     catch(Exception e) { flush.TrySetException(e);throw; }
                     continue;
                 }
-                byte[] data=packet.Data!; samples+=data.Length/2;
-                bool final=recognizer.AcceptWaveform(data,data.Length);
-                if(final)
-                {
-                    Publish(recognizer.Result(),"text",true);samples=0;partial="";
-                }
-                else
-                {
-                    using var result=JsonDocument.Parse(recognizer.PartialResult());
-                    string text=result.RootElement.GetProperty("partial").GetString()??"";
-                    if(partial!=text) { partial=text;Text?.Invoke(_source,text,false); }
-                }
-                // Bound unfinished utterances, even when a continuous stream has no silence.
-                if(samples>=16000*15) FinalizeSegment();
+                recognizer.Accept(packet.Data!);
             }
-            Publish(recognizer.FinalResult(),"text",true);
-            void FinalizeSegment()
-            {
-                Publish(recognizer!.FinalResult(),"text",true);
-                recognizer.Dispose();recognizer=new Vosk.VoskRecognizer(_model,16000f);
-                samples=0;partial="";
-            }
+            await recognizer.CompleteAsync();
         }
         catch(Exception e) { _ready.TrySetException(e);Fail(e); }
         finally
@@ -162,11 +158,6 @@ internal sealed class CaptionTrack : IAsyncDisposable
             recognizer?.Dispose();
             while(_queue.Reader.TryRead(out var packet)) packet.Flush?.TrySetException(new InvalidOperationException("Caption capture stopped."));
         }
-    }
-    private void Publish(string json,string key,bool final)
-    {
-        using var result=JsonDocument.Parse(json);
-        Text?.Invoke(_source,result.RootElement.GetProperty(key).GetString()??"",final);
     }
     public async ValueTask DisposeAsync()
     {
@@ -178,4 +169,44 @@ internal sealed class CaptionTrack : IAsyncDisposable
             _queue.Writer.TryComplete();await _worker;_device.Dispose();
         }
     }
+}
+
+internal sealed class VoskCaptionRecognizer : ICaptionRecognizer
+{
+    private readonly Vosk.Model _model;
+    private readonly Action<string,bool> _emit;
+    private Vosk.VoskRecognizer _recognizer;
+    private long _samples;
+    private string _partial="";
+    internal VoskCaptionRecognizer(Vosk.Model model,Action<string,bool> emit)
+    {
+        _model=model;_emit=emit;_recognizer=new Vosk.VoskRecognizer(model,16000f);
+    }
+    public void Accept(byte[] data)
+    {
+        _samples+=data.Length/2;
+        if(_recognizer.AcceptWaveform(data,data.Length)) { Publish(_recognizer.Result());_samples=0;_partial=""; }
+        else
+        {
+            using var result=JsonDocument.Parse(_recognizer.PartialResult());
+            string text=result.RootElement.GetProperty("partial").GetString()??"";
+            if(_partial!=text) { _partial=text;_emit(text,false); }
+        }
+        // Bound unfinished utterances, even when a continuous stream has no silence.
+        if(_samples>=16000*15) FinalizeSegment();
+    }
+    public Task FlushAsync() { FinalizeSegment();return Task.CompletedTask; }
+    public Task CompleteAsync() { Publish(_recognizer.FinalResult());return Task.CompletedTask; }
+    private void FinalizeSegment()
+    {
+        Publish(_recognizer.FinalResult());
+        _recognizer.Dispose();_recognizer=new Vosk.VoskRecognizer(_model,16000f);
+        _samples=0;_partial="";
+    }
+    private void Publish(string json)
+    {
+        using var result=JsonDocument.Parse(json);
+        _emit(result.RootElement.GetProperty("text").GetString()??"",true);
+    }
+    public void Dispose()=>_recognizer.Dispose();
 }
