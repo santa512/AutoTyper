@@ -38,10 +38,12 @@ internal static class CaptionModel
 {
     // Fast: Vosk small English (streaming, word-by-word, no punctuation).
     internal const string Name="vosk-model-small-en-us-0.15";
-    // Accurate: Whisper small.en (punctuated phrases), quantized to keep the download and memory moderate.
-    internal const string WhisperName="ggml-small.en-q5_1.bin";
-    private const long WhisperSize=190_098_681;
-    private const string WhisperSha256="BFDFF4894DCB76BBF647D56263EA2A96645423F1669176F4844A1BF8E478AD30";
+    // Accurate: Whisper base.en (punctuated phrases), quantized. small.en was measured at 6–10 s per
+    // 11 s phrase on a 4-core CPU, slower than live speech; base.en decodes the same phrase in ~1.5 s.
+    internal const string WhisperName="ggml-base.en-q5_1.bin";
+    private const string RetiredWhisperName="ggml-small.en-q5_1.bin";
+    private const long WhisperSize=59_721_011;
+    private const string WhisperSha256="4BAF70DD0D7C4247BA2B81FAFD9C01005AC77C2F9EF064E00DCF195D0E2FDD2F";
     private const string WhisperUrl="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/"+WhisperName;
     internal static string Root=>Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"AutoTyper","Speech");
     internal static string ModelPath=>Path.Combine(Root,Name);
@@ -86,6 +88,8 @@ internal static class CaptionModel
                 if(!digest.Equals(WhisperSha256,StringComparison.OrdinalIgnoreCase)) throw new IOException("Accurate caption model verification failed. Try downloading again.");
             }
             File.Move(partial,WhisperPath,true);partial=null;
+            // Free the space used by the slower model shipped in earlier test builds.
+            try { File.Delete(Path.Combine(Root,RetiredWhisperName)); } catch(IOException) { } catch(UnauthorizedAccessException) { }
         }
         finally
         {

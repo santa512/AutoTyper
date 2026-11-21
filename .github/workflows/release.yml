@@ -1,33 +1,79 @@
 name: Build Auto Typer release
+# Merging a version bump into main releases it: when AutoTyper.csproj's <Version> has no
+# vX.Y.Z tag yet, this builds and tests the app, then creates the tag and publishes the
+# release. Pushing a v* tag or running the workflow by hand still works too.
 on:
   push:
+    branches: [main]
     tags: ['v*']
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing main-x64 release tag (for example v0.3.2)
+        description: Existing main-x64 release tag to rebuild (for example v0.3.3)
         required: true
-        default: v0.3.2
+        default: v0.3.3
 permissions:
   contents: read
+concurrency:
+  group: release
+  cancel-in-progress: false
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      ref: ${{ steps.plan.outputs.ref }}
+      publish: ${{ steps.plan.outputs.publish }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      INPUT_TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.tag || github.sha }}
+      - id: plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            tag="$INPUT_TAG"; ref="$INPUT_TAG"; publish=true
+          elif [ "$GITHUB_REF_TYPE" = tag ]; then
+            tag="$GITHUB_REF_NAME"; ref="$GITHUB_REF_NAME"; publish=true
+          else
+            version=$(sed -n 's:.*<Version>\([^<]*\)</Version>.*:\1:p' AutoTyper.csproj | head -n 1)
+            if ! [[ "$version" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then echo "::error::Unexpected app version '$version'"; exit 1; fi
+            tag="v$version"; ref="$GITHUB_SHA"
+            # An existing tag means this version is already released (or a tag push is releasing it).
+            if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
+              publish=false; echo "$tag is already tagged; nothing to release."
+            else
+              publish=true; echo "Releasing new version $tag from $GITHUB_SHA."
+            fi
+          fi
+          if [ "$publish" = true ] && [ ! -f "release-notes/$tag.md" ]; then
+            echo "::error::Add release-notes/$tag.md before releasing $tag."; exit 1
+          fi
+          { echo "tag=$tag"; echo "ref=$ref"; echo "publish=$publish"; } >> "$GITHUB_OUTPUT"
   build:
+    needs: plan
+    if: needs.plan.outputs.publish == 'true'
     uses: ./.github/workflows/build-platforms.yml
     with:
-      source-ref: ${{ inputs.tag || github.ref_name }}
+      source-ref: ${{ needs.plan.outputs.ref }}
       edition: winui
   release:
-    needs: build
+    needs: [plan, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
     env:
-      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      RELEASE_TAG: ${{ needs.plan.outputs.tag }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ needs.plan.outputs.ref }}
       - uses: actions/download-artifact@v7
         with:
           pattern: release-*
@@ -41,9 +87,14 @@ jobs:
           sha256sum --check --strict ./*.sha256
           cd ../..
           if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release create "$RELEASE_TAG" --verify-tag --draft --title "Auto Typer $RELEASE_TAG" --notes-file "release-notes/$RELEASE_TAG.md"
+            # --target creates the tag on the built commit when the release is published;
+            # it is ignored when the tag already exists.
+            gh release create "$RELEASE_TAG" --target "$(git rev-parse HEAD)" --draft --title "Auto Typer $RELEASE_TAG" --notes-file "release-notes/$RELEASE_TAG.md"
           else
             gh release edit "$RELEASE_TAG" --notes-file "release-notes/$RELEASE_TAG.md"
           fi
           gh release upload "$RELEASE_TAG" dist/release/*.exe dist/release/*.msi dist/release/*.sha256 --clobber
           gh release edit "$RELEASE_TAG" --draft=false --latest
+      - name: Refresh the download page now that its files exist
+        shell: bash
+        run: gh workflow run pages.yml --ref main
