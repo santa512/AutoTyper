@@ -5,7 +5,7 @@ import vm from 'node:vm';
 const html = fs.readFileSync(new URL('../docs/index.html', import.meta.url), 'utf8');
 const script = fs.readFileSync(new URL('../docs/release.js', import.meta.url), 'utf8');
 // The public website describes the published release while the app may be ahead in development.
-const tag = 'v0.3.2';
+const tag = 'v0.3.3';
 assert(tag, 'Published release metadata has an explicit version');
 const version = tag.slice(1);
 const readme = fs.readFileSync(new URL('../README.md', import.meta.url), 'utf8');
@@ -25,7 +25,7 @@ for (const asset of assets) {
   assert(readme.includes(`/releases/download/${expected}/${asset}`), `README links to ${asset}`);
 }
 assert(html.includes(`VERSION ${version}`) && html.includes(`Download ${tag}`), 'Visible page version and title are current');
-assert(/Groq/.test(html) && /live captions/i.test(html) && /voice preview/i.test(html), 'v0.3.2 features are documented');
+assert(/Groq/.test(html) && /live captions/i.test(html) && /voice preview/i.test(html), 'Current features are documented');
 assert(!/\bWinUI\b|\bWin32\b/i.test(html), 'Public page uses edition names');
 assert(html.indexOf('/AutoTyper.exe"') < html.indexOf('/AutoTyperCompact.exe"'), 'Main app is the default download');
 assert(/14 days/.test(html) && /tray/i.test(html) && /English/.test(html), 'Current features are documented');
@@ -42,7 +42,7 @@ async function metadataCase(failedTag) {
       requested.push(url);
       if (url.endsWith('/' + failedTag)) throw new Error('offline');
       return { ok: true, json: async () => ({ assets: [
-        ...(url.endsWith('/v0.3.2') ? [{ name: 'AutoTyper.exe', size: 155688178 }] : [{ name: 'AutoTyperCompact.exe', size: 238592 }])
+        ...(url.endsWith('/' + tag) ? [{ name: 'AutoTyper.exe', size: 155688178 }] : [{ name: 'AutoTyperCompact.exe', size: 238592 }])
       ] }) };
     },
     document: { querySelectorAll: selector => {
