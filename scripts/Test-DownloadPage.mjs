@@ -5,7 +5,7 @@ import vm from 'node:vm';
 const html = fs.readFileSync(new URL('../docs/index.html', import.meta.url), 'utf8');
 const script = fs.readFileSync(new URL('../docs/release.js', import.meta.url), 'utf8');
 // The public website describes the published release while the app may be ahead in development.
-const tag = 'v0.3.3';
+const tag = 'v0.3.4';
 assert(tag, 'Published release metadata has an explicit version');
 const version = tag.slice(1);
 const readme = fs.readFileSync(new URL('../README.md', import.meta.url), 'utf8');
@@ -32,7 +32,7 @@ assert(/14 days/.test(html) && /tray/i.test(html) && /English/.test(html), 'Curr
 assert(/Microsoft Translator/.test(html) && /encrypted backup/.test(html) && /Six global shortcuts/.test(html), 'Translation, backup and sixth hotkey are documented');
 assert(/ARM64/.test(html) && /Run on startup/.test(html) && /Setup MSI/.test(html), 'Architectures, startup and setup downloads are documented');
 assert(!/\b(?:MiB|KiB)\b/.test(html + readme), 'Public download sizes use decimal units');
-assert(html.includes('155.7 MB') && html.includes('238.6 KB'), 'Offline sizes match the published assets');
+assert(html.includes('158.2 MB') && html.includes('238.6 KB'), 'Offline sizes match the published assets');
 
 async function metadataCase(failedTag) {
   const labels = { 'AutoTyper.exe': { textContent: 'fallback' }, 'AutoTyperCompact.exe': { textContent: 'fallback' } };
@@ -42,7 +42,7 @@ async function metadataCase(failedTag) {
       requested.push(url);
       if (url.endsWith('/' + failedTag)) throw new Error('offline');
       return { ok: true, json: async () => ({ assets: [
-        ...(url.endsWith('/' + tag) ? [{ name: 'AutoTyper.exe', size: 155688178 }] : [{ name: 'AutoTyperCompact.exe', size: 238592 }])
+        ...(url.endsWith('/' + tag) ? [{ name: 'AutoTyper.exe', size: 158236158 }] : [{ name: 'AutoTyperCompact.exe', size: 238592 }])
       ] }) };
     },
     document: { querySelectorAll: selector => {
@@ -53,7 +53,7 @@ async function metadataCase(failedTag) {
   });
   await new Promise(setImmediate);
   assert.deepEqual(requested.sort(), ['v0.2.2', tag].map(t => `https://api.github.com/repos/santa512/AutoTyper/releases/tags/${t}`).sort());
-  assert.equal(labels['AutoTyper.exe'].textContent, failedTag === tag ? 'fallback' : '155.7 MB');
+  assert.equal(labels['AutoTyper.exe'].textContent, failedTag === tag ? 'fallback' : '158.2 MB');
   assert.equal(labels['AutoTyperCompact.exe'].textContent, failedTag === 'v0.2.2' ? 'fallback' : '238.6 KB');
 }
 await metadataCase(null);
