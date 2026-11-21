@@ -1,8 +1,14 @@
 # Changelog
 
+## 0.3.4 — 2026-11-21 (main x64)
+
+- Fix Accurate captions showing only "…". The `small.en` model decoded speech slower than real time, so captions never caught up. Accurate mode now uses `base.en` (about 60 MB instead of 190 MB), which gives the same punctuated captions about 1–2 seconds after each pause. The old model file is removed after the new one downloads.
+- Stopping captions, closing the overlay or switching between Accurate and Fast now takes effect immediately instead of waiting for pending speech.
+- Merging a version bump into main now publishes the release automatically.
+
 ## 0.3.3 — 2026-11-21 (main x64)
 
-- Add an Accurate caption mode, now the default, using local Whisper `base.en` (about 60 MB, downloaded and SHA-256 verified on first use). Captions are punctuated and far more accurate; speech is split at natural pauses, with a live "…" preview while someone talks. Fast mode keeps the previous Vosk engine. Both run offline on this PC.
+- Add an Accurate caption mode, now the default, using local Whisper `small.en` (about 190 MB, downloaded and SHA-256 verified on first use). Captions are punctuated and far more accurate; speech is split at natural pauses, with a live "…" preview while someone talks. Fast mode keeps the previous Vosk engine. Both run offline on this PC.
 
 ## 0.3.2 — 2026-11-19 (main x64)
 
