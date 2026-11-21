@@ -25,6 +25,7 @@ public sealed partial class CaptionWindow : Window
     private CancellationTokenSource? _startup;
     private CaptionSession? _session;
     private bool _starting,_stopping,_translating,_closing,_loaded;
+    private CaptionEngine _engine=CaptionEngineChoice.Load();
     private int _displayCharacters;
 
     internal CaptionWindow(ElementTheme theme,string microphoneId,string microphoneName,
@@ -38,6 +39,8 @@ public sealed partial class CaptionWindow : Window
         ToolTipService.SetToolTip(IncludeMicrophone,$"Also caption {microphoneName}. Source labels identify System / Mic; they do not identify individual people within either source.");
         CaptionLanguage.ItemsSource=TranslationSettings.Languages;
         CaptionLanguage.SelectedItem=settings().TargetLanguage;
+        CaptionMode.ItemsSource=CaptionEngineChoice.Labels;
+        CaptionMode.SelectedIndex=(int)_engine;
         var presenter=(OverlappedPresenter)AppWindow.Presenter;
         presenter.IsAlwaysOnTop=true;
         presenter.IsMaximizable=false;
@@ -90,9 +93,10 @@ public sealed partial class CaptionWindow : Window
         if(_closing) return;
         CaptionRetry.Visibility=!_starting&&!_stopping&&_session is null&&_loaded?Visibility.Visible:Visibility.Collapsed;
         IncludeMicrophone.IsEnabled=!_starting&&!_stopping;
+        CaptionMode.IsEnabled=!_starting&&!_stopping&&!_translating;
         CaptionLanguage.IsEnabled=!_translating&&!_summarizing;
         CaptionSummarize.IsEnabled=!_summarizing&&_summaryConfigured()
-            &&(_summaryBuffer.HasText||_partial.Values.Any(text=>!string.IsNullOrWhiteSpace(text)));
+            &&(_summaryBuffer.HasText||_partial.Values.Any(text=>SpokenText(text).Length>0));
         ToolTipService.SetToolTip(CaptionSummarize,_summaryConfigured()
             ?(_summarizing?"Summarizing…":"Summarize captured captions with Groq")
             :"Configure your Groq API key in Settings → AI summary.");
@@ -115,6 +119,16 @@ public sealed partial class CaptionWindow : Window
         await StopAsync();
         await StartAsync();
     }
+    private async void Engine_Changed(object sender,SelectionChangedEventArgs e)
+    {
+        if(CaptionMode.SelectedIndex<0) return;
+        var engine=(CaptionEngine)CaptionMode.SelectedIndex;
+        if(engine==_engine) return;
+        _engine=engine;CaptionEngineChoice.Save(engine);
+        if(!_loaded||_starting||_stopping||_closing) return;
+        await StopAsync();
+        await StartAsync();
+    }
     private async Task StartAsync()
     {
         if(_starting||_stopping||_session is not null||_closing) return;
@@ -122,12 +136,13 @@ public sealed partial class CaptionWindow : Window
         _startup=CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
         var token=_startup.Token;
         bool mic=IncludeMicrophone.IsChecked==true;
+        var engine=_engine;
         UpdateControls();
         try
         {
-            await CaptionModel.EnsureAsync(new Progress<string>(message=> { if(_starting) SetStatus(message); }),token);
-            SetStatus("Loading captions…");
-            var session=await Task.Run(()=>new CaptionSession(CaptionModel.ModelPath,mic,_microphoneId),token);
+            await CaptionModel.EnsureAsync(engine,new Progress<string>(message=> { if(_starting) SetStatus(message); }),token);
+            SetStatus(engine==CaptionEngine.Accurate?"Loading accurate captions…":"Loading captions…");
+            var session=await Task.Run(()=>new CaptionSession(engine,CaptionModel.PathFor(engine),mic,_microphoneId),token);
             if(token.IsCancellationRequested) { await session.DisposeAsync();token.ThrowIfCancellationRequested(); }
             _session=session;
             session.Text+=(source,text,final)=>DispatcherQueue.TryEnqueue(()=>
@@ -154,6 +169,8 @@ public sealed partial class CaptionWindow : Window
         }
         finally { _starting=false;_startup.Dispose();_startup=null;UpdateControls(); }
     }
+    // Accurate mode marks in-progress speech with a trailing ellipsis; it is not part of the words.
+    private static string SpokenText(string text)=>text.TrimEnd().TrimEnd('…').Trim();
     private string FormatCaption(string source,string text)=>IncludeMicrophone.IsChecked==true||source!="System"?$"[{source}] {text}":text;
     private void ReceiveText(string source,string text,bool final)
     {

@@ -31,6 +31,8 @@
     <PackageReference Include="ZXing.Net" Version="0.16.11" />
     <PackageReference Include="NAudio.Wasapi" Version="3.3.0" />
     <PackageReference Include="Vosk" Version="0.3.38" />
+    <PackageReference Include="Whisper.net" Version="1.9.1" />
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
     <PackageReference Include="RapidOcrNet" Version="4.2.0" ExcludeAssets="build" />
     <Content Include="$(NuGetPackageRoot)rapidocrnet\4.2.0\models\v5\ch_*.onnx"
              Link="Assets\OCR\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

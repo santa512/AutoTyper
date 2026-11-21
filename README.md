@@ -37,7 +37,7 @@ The input highlights your current character. Typing pauses when the original inp
 - **Clipboard translation:** Microsoft Translator shows the original and translation together, with English as the default target language.
 - **Run on startup:** enable it in **Settings → General**; off by default. With tray mode enabled, sign-in starts the app in the tray.
 - **Global hotkeys and tray mode:** use tools from other apps; the translation hotkey brings Auto Typer forward. Change shortcuts in **Settings → Hotkeys**.
-- **Audio and captions:** local headphone voice preview and English system-audio captions, with optional labeled microphone input.
+- **Audio and captions:** local headphone voice preview and accurate, punctuated English system-audio captions (offline Whisper, with a lighter Fast mode), with optional labeled microphone input.
 - **AI summaries:** expandable Groq panels preserve your input and captions; primary and backup keys are supported.
 - **General settings:** theme, startup, tray click actions and encrypted backups.
 - **Capture privacy:** hide the main window and captions from supported capture tools in General settings.
