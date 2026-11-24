@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.5 — 2026-11-24 (main x64)
+
+- Send scan-code keyboard events for layout-supported characters, with Unicode fallback, to improve remote-desktop forwarding.
+- Simplify typing controls to Start/Stop and Pause/Resume; remove Reset progress.
+- Capture the foreground application window after the countdown without requiring an accessible text field. Continue across controls within that window; pause when leaving and resume on return. Remove the UI Automation/WPF dependency.
+
 ## 0.3.4 — 2026-11-21 (main x64)
 
 - Fix Accurate captions showing only "…". The `small.en` model decoded speech slower than real time, so captions never caught up. Accurate mode now uses `base.en` (about 60 MB instead of 190 MB), which gives the same punctuated captions about 1–2 seconds after each pause. The old model file is removed after the new one downloads.

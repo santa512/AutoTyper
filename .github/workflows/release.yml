@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing main-x64 release tag to rebuild (for example v0.3.4)
+        description: Existing main-x64 release tag to rebuild (for example v0.3.5)
         required: true
-        default: v0.3.4
+        default: v0.3.5
 permissions:
   contents: read
 concurrency:

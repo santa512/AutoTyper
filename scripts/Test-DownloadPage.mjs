@@ -5,7 +5,7 @@ import vm from 'node:vm';
 const html = fs.readFileSync(new URL('../docs/index.html', import.meta.url), 'utf8');
 const script = fs.readFileSync(new URL('../docs/release.js', import.meta.url), 'utf8');
 // The public website describes the published release while the app may be ahead in development.
-const tag = 'v0.3.4';
+const tag = 'v0.3.5';
 assert(tag, 'Published release metadata has an explicit version');
 const version = tag.slice(1);
 const readme = fs.readFileSync(new URL('../README.md', import.meta.url), 'utf8');
@@ -32,7 +32,7 @@ assert(/14 days/.test(html) && /tray/i.test(html) && /English/.test(html), 'Curr
 assert(/Microsoft Translator/.test(html) && /encrypted backup/.test(html) && /Six global shortcuts/.test(html), 'Translation, backup and sixth hotkey are documented');
 assert(/ARM64/.test(html) && /Run on startup/.test(html) && /Setup MSI/.test(html), 'Architectures, startup and setup downloads are documented');
 assert(!/\b(?:MiB|KiB)\b/.test(html + readme), 'Public download sizes use decimal units');
-assert(html.includes('158.2 MB') && html.includes('238.6 KB'), 'Offline sizes match the published assets');
+assert(html.includes('See release for size') && html.includes('238.6 KB'), 'Offline labels avoid stale main-release sizes');
 
 async function metadataCase(failedTag) {
   const labels = { 'AutoTyper.exe': { textContent: 'fallback' }, 'AutoTyperCompact.exe': { textContent: 'fallback' } };
