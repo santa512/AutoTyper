@@ -145,6 +145,7 @@ public sealed partial class MainWindow : Window
                 ShowWindow(_windowHandle, 5);
                 Activate();
                 StopButton.IsEnabled = true;
+        StopButton.Content = "Cancel";
                 StatusText.Text = "Uploading";
                 RegionSelectionText.Text = "Uploading screenshot to your public R2 bucket…";
                 Uri link = await new ScreenshotShareClient(ShareHttpClient).UploadAsync(png, _sharingSettings!, shareToken);
@@ -184,6 +185,7 @@ public sealed partial class MainWindow : Window
                 CancellationToken ocrToken = _ocrCancellation.Token;
                 SourceBox.IsReadOnly = true;
                 StopButton.IsEnabled = true;
+        StopButton.Content = "Cancel";
                 // Capture while hidden, then restore the UI during recognition.
                 CapturedScreen capture = await Task.Run(() => ScreenCapture.Capture(textRegion));
                 if (_isClosing) return;
@@ -959,6 +961,7 @@ public sealed partial class MainWindow : Window
         ClipboardButton.IsEnabled = StartPauseButton.IsEnabled = false;
         SourceBox.IsReadOnly = true;
         StopButton.IsEnabled = true;
+        StopButton.Content = "Cancel";
         EndHotkeyRecording();
         try
         {
@@ -1061,6 +1064,16 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void StartStop_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isRunning) StopButton_Click(sender, e);
+        else StartPauseButton_Click(sender, e);
+    }
+    private void PauseOrCancel_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isRunning) StartPauseButton_Click(sender, e);
+        else StopButton_Click(sender, e);
+    }
     private async void StartPauseButton_Click(object sender, RoutedEventArgs e)
     {
         if (_isReadingClipboard || _isSelectingRegion || _isClosing) return;
@@ -1071,7 +1084,7 @@ public sealed partial class MainWindow : Window
                 _isPaused = false;
                 _resumeSignal?.TrySetResult(true);
                 _resumeSignal = null;
-                StartPauseButton.Content = "Pause";
+                StopButton.Content = "Pause";
                 StatusText.Text = _isCountingDown ? "Getting ready" : "Typing";
             }
             else
@@ -1079,7 +1092,7 @@ public sealed partial class MainWindow : Window
                 _isPaused = true;
                 _resumeSignal = new TaskCompletionSource<bool>(
                     TaskCreationOptions.RunContinuationsAsynchronously);
-                StartPauseButton.Content = "Resume";
+                StopButton.Content = "Resume";
                 StatusText.Text = "Paused";
             }
 
@@ -1124,8 +1137,9 @@ public sealed partial class MainWindow : Window
         UpdateProgressText();
         _isPaused = false;
         _cancellation = new CancellationTokenSource();
-        StartPauseButton.Content = "Pause";
+        StartPauseButton.Content = "Stop";
         StopButton.IsEnabled = true;
+        StopButton.Content = "Pause";
         StatusText.Text = "Typing";
         ActivityText.Text = string.Empty;
 
@@ -1162,6 +1176,7 @@ public sealed partial class MainWindow : Window
         _typingFocusTarget = null;
         _focusPaused = false;
             StartPauseButton.Content = "Start";
+            StopButton.Content = "Pause";
             StopButton.IsEnabled = false;
             UpdateProgressText();
         }
@@ -1435,7 +1450,7 @@ public sealed partial class MainWindow : Window
             if (_typingFocusTarget is not null && !_typingFocusTarget.IsFocused())
             {
                 _focusPaused = true;
-                StatusText.Text = "Paused — return to the original text input";
+                StatusText.Text = "Waiting for original app — resumes automatically";
                 await Task.Delay(100, cancellationToken);
                 continue;
             }
@@ -1765,7 +1780,8 @@ public sealed partial class MainWindow : Window
     {
         string Shortcut(string action, int index) => _activeHotkeys[action].Label
             + (_globalHotkeys?.IsRegistered(GlobalHotkeyId + index) == true ? "" : " · unavailable");
-        ToolTipService.SetToolTip(StartPauseButton, $"Start / pause typing ({Shortcut("Typing", 0)})");
+        ToolTipService.SetToolTip(StartPauseButton, "Start a new run or stop the current run");
+        ToolTipService.SetToolTip(StopButton, $"Pause / resume typing ({Shortcut("Typing", 0)}); cancel other active operations");
         ToolTipService.SetToolTip(ScreenshotToolButton, $"Screenshot ({Shortcut("Screenshot", 1)}) — save PNG, or copy image when clipboard is on.");
         ToolTipService.SetToolTip(ShareToolButton, _sharingSettings is null
             ? "Configure your Cloudflare bucket in Settings to enable sharing."

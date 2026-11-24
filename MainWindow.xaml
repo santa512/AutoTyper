@@ -247,18 +247,17 @@
                 </StackPanel>
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Bottom">
-                <Button Content="Reset progress" Click="ResetButton_Click" />
                 <Button
                     x:Name="StopButton"
-                    Content="Stop"
+                    Content="Pause"
                     MinWidth="88"
                     IsEnabled="False"
-                    Click="StopButton_Click" />
+                    Click="PauseOrCancel_Click" />
                 <Button
                     x:Name="StartPauseButton"
                     Content="Start"
                     MinWidth="100"
-                    Click="StartPauseButton_Click"
+                    Click="StartStop_Click"
                     Style="{StaticResource AccentButtonStyle}" />
             </StackPanel>
         </Grid>

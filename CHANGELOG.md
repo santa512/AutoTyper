@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Capture the foreground application window after the countdown without requiring an accessible text field. Continue across controls within that window; pause when leaving and resume on return. Remove the UI Automation/WPF dependency.
+
+
 ## 0.3.2 — 2026-11-19 (main x64)
 
 - Automatically pause on focus loss and resume at the same typing progress when the original input is focused again. Check native control and accessibility identity; keep manual pause separate.

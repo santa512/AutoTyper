@@ -26,7 +26,6 @@
     <Content Include="audio\native\bin\x64\AutoTyperAudio.dll" Link="AutoTyperAudio.dll" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\Audio\*.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\Speech\*.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <FrameworkReference Include="Microsoft.WindowsDesktop.App.WPF" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.7.0" />
     <PackageReference Include="ZXing.Net" Version="0.16.11" />
     <PackageReference Include="NAudio.Wasapi" Version="3.3.0" />
