@@ -3,7 +3,7 @@ name: Publish download page
 on:
   push:
     branches: [main]
-    paths: ['docs/**', '.github/workflows/pages.yml']
+    paths: ['docs/**', 'AutoTyper.csproj', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
@@ -23,10 +23,28 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v4
+      # The page links to the app version's release files. When a merge bumps the version,
+      # wait for the release workflow to publish them; it runs this workflow again afterwards.
+      - id: ready
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="v$(sed -n 's:.*<Version>\([^<]*\)</Version>.*:\1:p' AutoTyper.csproj | head -n 1)"
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] || gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft -q '.isDraft' 2>/dev/null | grep -qx false; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::$tag is not published yet; the release workflow will deploy the page once it is."
+          fi
+      - if: steps.ready.outputs.ready == 'true'
+        uses: actions/configure-pages@v5
+      - if: steps.ready.outputs.ready == 'true'
+        uses: actions/upload-pages-artifact@v4
         with:
           path: docs
       - name: Deploy
+        if: steps.ready.outputs.ready == 'true'
         id: deployment
         uses: actions/deploy-pages@v4

@@ -4,8 +4,8 @@
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
     <RootNamespace>AutoTyper</RootNamespace>
-    <Version>0.3.2</Version>
-    <InformationalVersion>0.3.2</InformationalVersion>
+    <Version>0.3.5</Version>
+    <InformationalVersion>0.3.5</InformationalVersion>
     <Product>Auto Typer</Product>
     <Description>Automatic typing with natural rhythm and global keyboard output.</Description>
     <ApplicationManifest>app.manifest</ApplicationManifest>
@@ -30,6 +30,8 @@
     <PackageReference Include="ZXing.Net" Version="0.16.11" />
     <PackageReference Include="NAudio.Wasapi" Version="3.3.0" />
     <PackageReference Include="Vosk" Version="0.3.38" />
+    <PackageReference Include="Whisper.net" Version="1.9.1" />
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
     <PackageReference Include="RapidOcrNet" Version="4.2.0" ExcludeAssets="build" />
     <Content Include="$(NuGetPackageRoot)rapidocrnet\4.2.0\models\v5\ch_*.onnx"
              Link="Assets\OCR\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

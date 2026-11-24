@@ -21,9 +21,55 @@ transcript.Add("System","first");transcript.Add("Mic","second");
 var limited=transcript.Snapshot(16)!;
 Require(limited.Count==1&&limited.Text=="[System] first","Requests stop at complete segment boundaries within the character limit");
 transcript.Acknowledge(limited);Require(transcript.Snapshot()!.Text=="[Mic] second","Text beyond the request limit is kept for the next translation");
+byte[] Tone(double seconds,double amplitude)
+{
+    var bytes=new byte[(int)(seconds*16000)*2];
+    for(int i=0;i<bytes.Length/2;i++)
+    {
+        short value=(short)(amplitude*32767*Math.Sin(2*Math.PI*220*i/16000));
+        bytes[i*2]=(byte)value;bytes[i*2+1]=(byte)(value>>8);
+    }
+    return bytes;
+}
+var chunks=new List<float[]>();var segmenter=new CaptionSegmenter();
+segmenter.Accept(Tone(1,0),chunks);
+Require(chunks.Count==0&&!segmenter.Active,"Silence does not start a caption phrase");
+segmenter.Accept(Tone(1.5,0.2),chunks);
+Require(segmenter.Active&&chunks.Count==0,"Speech-level audio starts a phrase and waits for a pause");
+segmenter.Accept(Tone(1,0),chunks);
+Require(chunks.Count==1&&!segmenter.Active,"A pause ends the phrase");
+Require(chunks[0].Length>=16000*1.5&&chunks[0].Length<=16000*2.2,"Phrases keep short lead-in and tail audio around speech");
+chunks.Clear();segmenter.Accept(Tone(0.1,0.2),chunks);segmenter.Accept(Tone(1,0),chunks);
+Require(chunks.Count==0,"Clicks shorter than a syllable are ignored");
+segmenter.Accept(Tone(25,0.2),chunks);
+Require(chunks.Count==1&&chunks[0].Length<=CaptionSegmenter.MaximumSamples&&segmenter.Active,"Continuous speech is split into bounded phrases without losing the remainder");
+segmenter.Accept(Tone(0.5,0.2),chunks);
+Require(segmenter.Cut() is { Length: >0 }&&!segmenter.Active,"Translate can cut an in-progress phrase immediately");
+Require(WhisperCaptionRecognizer.Clean(" [Music] Hello there. (laughs) ♪ ")=="Hello there.","Non-speech annotations are removed from accurate captions");
+Require(WhisperCaptionRecognizer.Clean("Thanks for watching!")==""&&WhisperCaptionRecognizer.Clean("Thank you.")=="Thank you.","Stock silence hallucinations are dropped while real short replies are kept");
 CaptionSpeechRuntime.EnsureAvailable();
 Require(true,"Pinned x64 speech engine and native dependencies load without a model download");
-if(args.Length>=2)
+CaptionSpeechRuntime.EnsureWhisperAvailable();
+Require(true,"Accurate (Whisper) CPU runtime loads without a model download");
+if(args.Length>=2&&args[0].EndsWith(".bin",StringComparison.OrdinalIgnoreCase))
+{
+    // Accurate mode: feed a real recording through the segmenter and Whisper recognizer.
+    using var engine=new WhisperCaptionEngine(args[0]);
+    using var reader=new WaveFileReader(args[1]);
+    Require(reader.WaveFormat.SampleRate==16000&&reader.WaveFormat.BitsPerSample==16&&reader.WaveFormat.Channels==1,"Real speech test uses mono 16 kHz PCM");
+    var finals=new List<string>();Exception? failure=null;
+    var recognizer=new WhisperCaptionRecognizer(engine,(text,final)=> { if(final&&text.Length>0) lock(finals) finals.Add(text); },e=>failure=e);
+    var watch=System.Diagnostics.Stopwatch.StartNew();
+    byte[] buffer=new byte[3200];int count;
+    while((count=reader.Read(buffer,0,buffer.Length))>0) recognizer.Accept(buffer[..count]);
+    await recognizer.CompleteAsync();recognizer.Dispose();
+    if(failure is not null) throw failure;
+    string text=string.Join(" ",finals);
+    Console.WriteLine("RECOGNIZED: "+text);
+    Require(text.Split(' ',StringSplitOptions.RemoveEmptyEntries).Length>=8,"Accurate engine recognizes words from a real speech recording");
+    Console.WriteLine($"Accurate recognition: {reader.TotalTime.TotalSeconds:0.0}s audio in {watch.Elapsed.TotalSeconds:0.00}s");
+}
+else if(args.Length>=2)
 {
     using var model=new Vosk.Model(args[0]);
     using var recognizer=new Vosk.VoskRecognizer(model,16000f);

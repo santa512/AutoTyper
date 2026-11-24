@@ -1,4 +1,14 @@
-Local English captions use Vosk API 0.3.38 (Alpha Cephei Inc, Apache-2.0).
+Accurate captions (default) use Whisper.net 1.9.1 and its CPU runtime, built on
+whisper.cpp and ggml (MIT License, see Whisper-LICENSE.txt).
+https://github.com/sandrohanea/whisper.net
+https://github.com/ggml-org/whisper.cpp
+
+The ggml-base.en-q5_1.bin model is downloaded on first use from the official
+whisper.cpp model repository on Hugging Face and verified by SHA-256. It is a
+converted OpenAI Whisper model (MIT License).
+https://huggingface.co/ggerganov/whisper.cpp
+
+Fast captions use Vosk API 0.3.38 (Alpha Cephei Inc, Apache-2.0).
 https://github.com/alphacep/vosk-api
 
 The optional vosk-model-small-en-us-0.15 model is downloaded from the
