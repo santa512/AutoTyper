@@ -32,7 +32,7 @@ assert(/14 days/.test(html) && /tray/i.test(html) && /English/.test(html), 'Curr
 assert(/Microsoft Translator/.test(html) && /encrypted backup/.test(html) && /Six global shortcuts/.test(html), 'Translation, backup and sixth hotkey are documented');
 assert(/ARM64/.test(html) && /Run on startup/.test(html) && /Setup MSI/.test(html), 'Architectures, startup and setup downloads are documented');
 assert(!/\b(?:MiB|KiB)\b/.test(html + readme), 'Public download sizes use decimal units');
-assert(html.includes('158.2 MB') && html.includes('238.6 KB'), 'Offline sizes match the published assets');
+assert(html.includes('See release for size') && html.includes('238.6 KB'), 'Offline labels avoid stale main-release sizes');
 
 async function metadataCase(failedTag) {
   const labels = { 'AutoTyper.exe': { textContent: 'fallback' }, 'AutoTyperCompact.exe': { textContent: 'fallback' } };
